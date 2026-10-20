@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Colonia Nova</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: full-bleed 3D canvas; HUD pinned to safe edges; bottom sheet for the shop; centered panels. Single dark look on purpose (a colony console at night). */
+:root {
+  --void: #0a0e1a;
+  --panel: rgba(13, 19, 34, 0.84);
+  --panel-solid: #111a2e;
+  --raise: rgba(255, 255, 255, 0.05);
+  --line: rgba(150, 180, 255, 0.24);
+  --ink: #e9eefb;
+  --dim: #9aa6c2;
+  --scrap: #f2b84b;
+  --crystal: #6fe3ff;
+  --alien: #ff4fd8;
+  --core: #7dffb0;
+  --danger: #ff6b5e;
+  --f-display: 'Chakra Petch', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --f-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--void); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+.hud {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: flex-start; pointer-events: none;
+}
+.group { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+.chip {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 11px; display: flex; align-items: center; gap: 9px;
+  font-family: var(--f-display); font-variant-numeric: tabular-nums; backdrop-filter: blur(6px);
+}
+.stat { font-size: 15px; font-weight: 700; }
+small.lbl { display: block; font-family: var(--f-body); font-weight: 400; font-size: 10.5px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+.gem { width: 12px; height: 12px; transform: rotate(45deg); border-radius: 2px; flex: none; display: inline-block; }
+.gem.scrap { background: var(--scrap); }
+.gem.crystal { background: var(--crystal); }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: #4fb8ff; flex: none; }
+.timer { flex-direction: column; align-items: center; gap: 0; padding: 7px 16px; min-width: 170px; }
+.timer strong { font-size: 24px; line-height: 1.1; }
+.timer.night { border-color: var(--alien); }
+.timer.night strong { color: var(--alien); }
+.corechip { min-width: 150px; flex-direction: column; align-items: stretch; gap: 3px; }
+.bar { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; background: var(--core); transition: width 0.15s linear; }
+.iconbtn { pointer-events: auto; min-width: 44px; padding: 0 12px; font-size: 20px; line-height: 1; }
+
+.controls {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+}
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.hint { font-size: 12.5px; color: var(--dim); text-align: center; text-wrap: balance; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
+button {
+  pointer-events: auto; cursor: pointer;
+  font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: 0.04em;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 15px; min-height: 44px;
+}
+button:hover { border-color: var(--crystal); }
+button:focus-visible { outline: 2px solid var(--crystal); outline-offset: 2px; }
+button.primary { background: var(--core); color: #06210f; border-color: var(--core); }
+button.warn { border-color: var(--alien); }
+button.danger { border-color: var(--danger); color: var(--danger); }
+button[disabled] { opacity: 0.42; cursor: not-allowed; }
+
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
+  background: var(--panel-solid); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0;
+  padding-top: 14px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  max-height: 62%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+}
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; max-width: 900px; width: 100%; margin: 0 auto; }
+.sheet-head h3 { margin: 0; font-family: var(--f-display); font-size: 20px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; max-width: 900px; width: 100%; margin: 0 auto; }
+.item {
+  text-align: left; display: grid; grid-template-columns: 34px 1fr; gap: 4px 10px; align-items: start;
+  background: var(--raise); padding: 11px 12px; min-height: 0; font-family: var(--f-body); font-weight: 400; letter-spacing: 0;
+}
+.item .sw { grid-row: span 3; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); }
+.item strong { font-family: var(--f-display); font-size: 15px; }
+.item .d { font-size: 12.5px; color: var(--dim); line-height: 1.35; }
+.item .meta { display: flex; justify-content: space-between; gap: 8px; font-family: var(--f-display); font-size: 13px; font-variant-numeric: tabular-nums; }
+.item .meta .c { display: flex; align-items: center; gap: 6px; }
+.item .lock { color: var(--scrap); font-size: 12px; }
+.placebar {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 6;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); width: max-content; max-width: calc(100% - 32px);
+  display: flex; align-items: center; gap: 12px; background: var(--panel-solid); border: 1px solid var(--crystal); border-radius: 12px; padding: 8px 8px 8px 14px; font-size: 14px;
+}
+
+.overlay {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px; background: rgba(6, 9, 18, 0.72); overflow-y: auto;
+}
+.card { width: min(480px, 100%); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font-family: var(--f-display); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--crystal); }
+h1, h2 { font-family: var(--f-display); margin: 0; text-wrap: balance; line-height: 1.05; }
+h1 { font-size: 44px; letter-spacing: 0.02em; }
+h2 { font-size: 26px; }
+.card p { margin: 0; line-height: 1.5; }
+.muted { color: var(--dim); font-size: 13px; }
+.howto { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.howto li { display: grid; grid-template-columns: 96px 1fr; gap: 10px; font-size: 14px; line-height: 1.4; }
+.howto b { font-family: var(--f-display); color: var(--dim); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; font-size: 12px; padding-top: 2px; }
+.rows { display: grid; gap: 8px; }
+.row { display: flex; justify-content: space-between; gap: 12px; align-items: center; background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.row span:last-child { font-family: var(--f-display); font-variant-numeric: tabular-nums; text-align: right; }
+.report { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.report li { background: var(--raise); border: 1px solid var(--line); border-left: 3px solid var(--dim); border-radius: 8px; padding: 9px 12px; font-size: 14px; line-height: 1.4; }
+.report li.good { border-left-color: var(--core); }
+.report li.bad { border-left-color: var(--danger); }
+.report li.gold { border-left-color: var(--scrap); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions button { flex: 1 1 auto; }
+.cost { display: inline-flex; align-items: center; gap: 6px; }
+
+#banner {
+  position: fixed; left: 0; right: 0; top: 30%; z-index: 6; text-align: center; pointer-events: none;
+  font-family: var(--f-display); font-weight: 700; font-size: clamp(30px, 8vw, 62px); letter-spacing: 0.16em;
+  text-shadow: 0 2px 24px rgba(0,0,0,0.7); opacity: 0; transition: opacity 0.4s; padding-inline: 16px;
+}
+#banner small { display: block; font-size: 0.32em; letter-spacing: 0.06em; font-weight: 500; color: var(--ink); margin-top: 8px; }
+#banner.show { opacity: 1; }
+#toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); z-index: 7;
+  transform: translateX(-50%); background: var(--panel-solid); border: 1px solid var(--danger);
+  padding: 8px 14px; border-radius: 10px; font-size: 13.5px; pointer-events: none; opacity: 0; transition: opacity 0.2s; max-width: calc(100% - 32px); text-align: center;
+}
+#toast.show { opacity: 1; }
+#toast.good { border-color: var(--core); }
+#toast.gold { border-color: var(--scrap); }
+.stick { position: fixed; z-index: 4; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); pointer-events: none; }
+.stick i { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255,255,255,0.35); }
+@media (max-width: 560px) {
+  h1 { font-size: 36px; }
+  .stat small.lbl { display: none; }
+  .timer { min-width: 0; order: -1; width: 100%; }
+  .corechip { min-width: 120px; }
+  .howto li { grid-template-columns: 1fr; gap: 2px; }
+}
+@media (prefers-reduced-motion: reduce) { #banner, #toast, .bar i { transition: none; } }
+</style>
+</head>
+<body>
+
+<canvas id="game" aria-label="Colonia Nova, vista de la colonia"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="group">
+    <div class="chip stat"><span class="gem scrap"></span><div><small class="lbl">Chatarra</small><span id="scrap">0</span></div></div>
+    <div class="chip stat"><span class="gem crystal"></span><div><small class="lbl">Cristales</small><span id="crys">0</span></div></div>
+    <div class="chip stat"><span class="dot"></span><div><small class="lbl">Colonos</small><span id="colCount">0</span></div></div>
+  </div>
+  <div class="chip timer" id="timerChip"><small class="lbl" id="timerLbl">Próximo ataque en</small><strong id="timer">1:30</strong></div>
+  <div class="group">
+    <div class="chip corechip"><small class="lbl" id="coreLbl">Núcleo · nivel 1</small><span class="stat" id="coreTxt">120</span><div class="bar"><i id="coreBar"></i></div></div>
+    <button class="iconbtn" id="menuBtn" type="button" aria-label="Menú">⋯</button>
+  </div>
+</div>
+
+<div class="controls" id="controls" hidden>
+  <div class="btnrow">
+    <button id="buildBtn" type="button">Construir</button>
+    <button id="coreBtn" type="button">Núcleo</button>
+    <button id="nightBtn" type="button" class="warn">Adelantar ataque</button>
+  </div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<div class="placebar" id="placeBar" hidden><span id="placeTxt">Colocando</span><button id="placeDone" type="button">Listo</button></div>
+
+<div class="sheet" id="shop" hidden>
+  <div class="sheet-head"><h3>Construir</h3><button id="shopClose" type="button">Cerrar</button></div>
+  <div class="shop-grid" id="shopGrid"></div>
+</div>
+
+<div id="banner"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="stick" id="stick" hidden><i id="knob"></i></div>
+
+<div class="overlay" id="startScreen">
+  <div class="card">
+    <div class="eyebrow">Prototipo v2 · formas simples a propósito</div>
+    <h1>Colonia Nova</h1>
+    <p>Construye tu colonia en un planeta desconocido. Cada noche atacan los alienígenas. Tu colonia se guarda: cuanto más la mejores, más lejos llegarás.</p>
+    <ul class="howto">
+      <li><b>Moverte</b><span id="moveHelp">WASD o flechas. En móvil, arrastra el dedo.</span></li>
+      <li><b>Construir</b><span>Muros, torretas, minas, hábitats, láseres y morteros. Cada uno cuesta distinto.</span></li>
+      <li><b>Núcleo</b><span>Es el corazón de la colonia. Súbelo de nivel para construir más y desbloquear edificios.</span></li>
+      <li><b>Chatarra</b><span>Sale sobre todo de las minas: pasa cerca para recogerla.</span></li>
+      <li><b>Noche</b><span>El aviso de arriba dice cuándo atacan. Tu astronauta y los colonos disparan solos.</span></li>
+    </ul>
+    <button id="startBtn" class="primary" type="button">Fundar la colonia</button>
+  </div>
+</div>
+
+<div class="overlay" id="corePanel" hidden>
+  <div class="card">
+    <div class="eyebrow">El corazón de la colonia</div>
+    <h2 id="cpTitle">Núcleo · nivel 1</h2>
+    <div class="rows" id="cpRows"></div>
+    <p class="muted" id="cpNext"></p>
+    <div class="actions"><button id="cpUpgrade" class="primary" type="button">Mejorar</button><button id="cpClose" type="button">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="reportPanel" hidden>
+  <div class="card">
+    <div class="eyebrow" id="rpEyebrow">Informe de la colonia</div>
+    <h2 id="rpTitle">Mientras no estabas</h2>
+    <ul class="report" id="rpList"></ul>
+    <button id="rpClose" class="primary" type="button">Vale</button>
+  </div>
+</div>
+
+<div class="overlay" id="menuPanel" hidden>
+  <div class="card">
+    <div class="eyebrow">Menú</div>
+    <h2>Colonia Nova</h2>
+    <p class="muted">Para probar los ataques mientras no juegas sin esperar de verdad:</p>
+    <button id="simBtn" type="button">Simular que vuelves tras 2 horas</button>
+    <div id="resetBox" class="rows">
+      <button id="resetBtn" class="danger" type="button">Borrar la partida</button>
+    </div>
+    <div class="actions" id="resetConfirm" hidden>
+      <button id="resetYes" class="danger" type="button">Sí, borrar todo</button>
+      <button id="resetNo" type="button">No</button>
+    </div>
+    <button id="menuClose" class="primary" type="button">Cerrar</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  // =============== tuning ===============
+  const TAU = Math.PI * 2, ARENA = 26, DAY_LEN = 90, SPAWN_WINDOW = 32, OFFLINE_EVERY = 20 * 60, PLANET_GOAL = 10;
+  const MINE_RATE = 0.45, MINE_CAP = 50, PLAYER_RANGE = 8, GRID = 2;
+  const DEF = {
+    muro:    { name: 'Muro', desc: 'Barato y resistente. Frena a los alienígenas.', cost: 15, hp: 70, r: 0.9, lock: 1, sw: '#8c97ad' },
+    torreta: { name: 'Torreta', desc: 'Dispara a un enemigo. Alcance medio.', cost: 45, hp: 45, r: 1, lock: 1, range: 8.5, rate: 0.6, dmg: 1.2, def: 1, sw: '#d6dcea' },
+    mina:    { name: 'Mina de chatarra', desc: 'Produce chatarra. Pasa cerca para recogerla.', cost: 60, hp: 40, r: 1, lock: 1, sw: '#f2b84b' },
+    habitat: { name: 'Hábitat', desc: 'Aloja 2 colonos que luchan de noche.', cost: 90, hp: 60, r: 1.3, lock: 2, sw: '#f2f4f8' },
+    laser:   { name: 'Torre láser', desc: 'Disparo muy rápido. Alcance corto.', cost: 110, hp: 50, r: 1, lock: 2, range: 6, rate: 0.12, dmg: 0.45, def: 1.5, sw: '#6fe3ff' },
+    mortero: { name: 'Mortero', desc: 'Daño en área a gran distancia.', cost: 150, hp: 55, r: 1.1, lock: 3, range: 12, min: 3, rate: 2.4, dmg: 4, area: 2.4, def: 2, sw: '#ff9f5a' }
+  };
+  const ORDER = ['muro', 'torreta', 'mina', 'habitat', 'laser', 'mortero'];
+  const LIMITS = { muro: [10, 16, 24, 32, 40], torreta: [2, 3, 4, 5, 6], mina: [1, 2, 3, 3, 4], habitat: [0, 1, 2, 2, 3], laser: [0, 1, 2, 2, 3], mortero: [0, 0, 1, 2, 2] };
+  const CORE = [{ hp: 120, s: 150, c: 0 }, { hp: 180, s: 350, c: 3 }, { hp: 260, s: 700, c: 6 }, { hp: 350, s: 1100, c: 10 }, { hp: 450 }];
+  const ALIEN = {
+    bicho: { r: 0.5, hp: 3, spd: 2.3, dps: 6, col: 0xff4fd8, drop: 2, cry: 0 },
+    veloz: { r: 0.38, hp: 2, spd: 4.2, dps: 4, col: 0x9dff4f, drop: 2, cry: 0 },
+    jefe:  { r: 1.3, hp: 40, spd: 1.2, dps: 22, col: 0xff7a3d, drop: 40, cry: 4 }
+  };
+
+  const $ = (s) => document.querySelector(s);
+  const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+
+  // =============== save ===============
+  const SAVE_KEY = 'colonia-nova-v2';
+  const freshSave = () => ({ scrap: 140, crys: 0, coreLv: 1, nights: 0, buildings: [], lastSeen: Date.now(), planetShown: false });
+  function loadSave() {
+    try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && Array.isArray(s.buildings) && typeof s.scrap === 'number') return s; } catch (e) {}
+    return null;
+  }
+  let G = loadSave();
+  const isNew = !G;
+  if (!G) G = freshSave();
+  function persist() {
+    G.buildings = buildings.map((b) => ({ t: b.t, x: b.x, z: b.z, store: Math.floor(b.store || 0) }));
+    G.lastSeen = Date.now();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {}
+  }
+
+  // =============== renderer ===============
+  const canvas = $('#game');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x000000, 60, 140);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+  let camScale = 1;
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    camScale = w < h ? 1.6 : 1;
+  }
+  window.addEventListener('resize', resize); resize();
+
+  const MC = {};
+  function M(c, e, ei) {
+    const k = c + '|' + (e || 0) + '|' + (ei || 0);
+    return MC[k] || (MC[k] = new THREE.MeshStandardMaterial({ color: c, emissive: e || 0, emissiveIntensity: ei || 0, flatShading: true, roughness: 0.85 }));
+  }
+  const glowMats = [];
+  function glow(c, base) { const m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: base, flatShading: true }); glowMats.push({ m, base }); return m; }
+  const Box = (a, b, c) => new THREE.BoxGeometry(a, b, c);
+  const Cyl = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s);
+  function mesh(geo, mat, x, y, z) { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.castShadow = true; m.receiveShadow = true; return m; }
+
+  // =============== lights / sky ===============
+  const PAL = {
+    day:   { bg: new THREE.Color('#a8cde4'), sky: new THREE.Color('#eaf5ff'), gnd: new THREE.Color('#8a6a4a'), hemi: 0.85, sun: new THREE.Color('#fff0d2'), sunI: 1.15, near: 70, far: 160 },
+    night: { bg: new THREE.Color('#060a17'), sky: new THREE.Color('#2b3d73'), gnd: new THREE.Color('#0d1020'), hemi: 0.36, sun: new THREE.Color('#6d84cc'), sunI: 0.24, near: 30, far: 75 }
+  };
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xffffff, 1);
+  sun.position.set(-20, 34, 14); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera; sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 100; sc.updateProjectionMatrix();
+  scene.add(sun);
+  // stars + moons (no fog)
+  const starGeo = new THREE.BufferGeometry(); const sp = [];
+  for (let i = 0; i < 700; i++) { const a = Math.random() * TAU, e = Math.random() * 0.9 + 0.08, R = 170; sp.push(Math.cos(a) * Math.cos(e) * R, Math.sin(e) * R, Math.sin(a) * Math.cos(e) * R); }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+  scene.add(new THREE.Points(starGeo, starMat));
+  const moonMatA = new THREE.MeshBasicMaterial({ color: 0xd9e4ff, transparent: true, opacity: 0, fog: false });
+  const moonMatB = new THREE.MeshBasicMaterial({ color: 0xffb3e6, transparent: true, opacity: 0, fog: false });
+  const moonA = new THREE.Mesh(new THREE.SphereGeometry(9, 20, 14), moonMatA); moonA.position.set(-70, 60, -130); scene.add(moonA);
+  const moonB = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 12), moonMatB); moonB.position.set(50, 45, -140); scene.add(moonB);
+
+  let mix = 0, mixTarget = 0;
+  const tmpC = new THREE.Color();
+  function applyPalette() {
+    const d = PAL.day, n = PAL.night;
+    if (!(scene.background instanceof THREE.Color)) scene.background = new THREE.Color();
+    scene.background.copy(d.bg).lerp(n.bg, mix);
+    scene.fog.color.copy(scene.background);
+    scene.fog.near = d.near + (n.near - d.near) * mix; scene.fog.far = d.far + (n.far - d.far) * mix;
+    hemi.color.copy(d.sky).lerp(n.sky, mix);
+    hemi.groundColor.copy(tmpC.copy(d.gnd).lerp(n.gnd, mix));
+    hemi.intensity = d.hemi + (n.hemi - d.hemi) * mix;
+    sun.color.copy(d.sun).lerp(n.sun, mix); sun.intensity = d.sunI + (n.sunI - d.sunI) * mix;
+    starMat.opacity = mix; moonMatA.opacity = mix; moonMatB.opacity = mix * 0.9;
+    glowMats.forEach((g) => { g.m.emissiveIntensity = g.base * (0.35 + mix * 1.1); });
+    if (coreLight) coreLight.intensity = 0.4 + mix * 2;
+    if (commander) commander.lamp.intensity = mix * 2.2;
+  }
+
+  // =============== ground & scenery ===============
+  const gGeo = new THREE.PlaneGeometry(110, 110, 55, 55); gGeo.rotateX(-Math.PI / 2);
+  const gp = gGeo.attributes.position;
+  for (let i = 0; i < gp.count; i++) {
+    const x = gp.getX(i), z = gp.getZ(i), r = Math.hypot(x, z);
+    let h = (Math.random() - 0.5) * 0.16;
+    if (r > ARENA + 1) h += (r - ARENA - 1) * (0.25 + Math.random() * 0.35);
+    gp.setY(i, h);
+  }
+  gGeo.computeVertexNormals();
+  const ground = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ color: 0xb98458, flatShading: true, roughness: 1 }));
+  ground.receiveShadow = true; scene.add(ground);
+  const edge = new THREE.Mesh(new THREE.RingGeometry(ARENA - 0.15, ARENA, 120), new THREE.MeshBasicMaterial({ color: 0x6fe3ff, transparent: true, opacity: 0.22 }));
+  edge.rotation.x = -Math.PI / 2; edge.position.y = 0.08; scene.add(edge);
+  const rockMat = M(0x8f6a4e);
+  for (let i = 0; i < 50; i++) {
+    const a = Math.random() * TAU, r = ARENA + 3 + Math.random() * 18, s = 0.8 + Math.random() * 2.8;
+    const m = mesh(new THREE.DodecahedronGeometry(s, 0), rockMat, Math.cos(a) * r, s * 0.4 + (r - ARENA) * 0.25, Math.sin(a) * r);
+    m.rotation.set(Math.random() * 3, Math.random() * 3, 0); scene.add(m);
+  }
+  // craters inside the colony
+  for (let i = 0; i < 7; i++) {
+    const a = Math.random() * TAU, r = 7 + Math.random() * (ARENA - 10), s = 1 + Math.random() * 1.4;
+    const c = new THREE.Mesh(new THREE.RingGeometry(s * 0.6, s, 10), new THREE.MeshStandardMaterial({ color: 0x9a6c47, flatShading: true }));
+    c.rotation.x = -Math.PI / 2; c.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r); c.receiveShadow = true; scene.add(c);
+  }
+  // alien flora outside the colony (glows at night)
+  const floraCaps = [glow(0x6fe3ff, 0.6), glow(0xc77dff, 0.6), glow(0x9dff4f, 0.5)];
+  const stemMat = M(0x5b4a6b);
+  for (let i = 0; i < 40; i++) {
+    const a = Math.random() * TAU, r = ARENA + 1.5 + Math.random() * 8, h = 0.6 + Math.random() * 1.6;
+    const g = new THREE.Group();
+    g.add(mesh(Cyl(0.08, 0.12, h, 5), stemMat, 0, h / 2, 0));
+    const cap = mesh(new THREE.SphereGeometry(0.3 + Math.random() * 0.35, 7, 5, 0, TAU, 0, Math.PI / 2), floraCaps[i % 3], 0, h, 0);
+    g.add(cap); g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); g.rotation.z = (Math.random() - 0.5) * 0.4; scene.add(g);
+  }
+
+  // =============== core (the colony's town hall) ===============
+  const coreG = new THREE.Group(); scene.add(coreG);
+  let coreLight = null, coreGem = null, coreRings = [], coreBeacon = null;
+  const CORE_T = { t: 'core', x: 0, z: 0, r: 3.2, dead: false };
+  const padMat = glow(0x7dffb0, 0.9);
+  const beaconMat = glow(0xff4f6a, 1.2);
+  function buildCore(lv) {
+    while (coreG.children.length) coreG.remove(coreG.children[0]);
+    coreRings = [];
+    coreG.add(mesh(Cyl(3.3, 3.6, 0.5, 8), M(0x4a5468), 0, 0.25, 0));
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + TAU / 16; coreG.add(mesh(Box(0.35, 0.12, 0.35), padMat, Math.cos(a) * 3.15, 0.55, Math.sin(a) * 3.15)); }
+    // steps
+    for (let i = 0; i < 4; i++) { const a = i / 4 * TAU; const s = mesh(Box(1.2, 0.25, 0.7), M(0x5d6880), Math.cos(a) * 3.75, 0.13, Math.sin(a) * 3.75); s.rotation.y = -a; coreG.add(s); }
+    coreG.add(mesh(Cyl(2.2, 2.6, 1.7, 8), M(0x9aa6bd), 0, 1.35, 0));
+    coreG.add(mesh(Cyl(2.24, 2.24, 0.28, 8), glow(0x7dffb0, 0.7), 0, 1.6, 0));
+    // windows
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; const w = mesh(Box(0.5, 0.3, 0.1), glow(0x9fe8ff, 0.5), Math.cos(a) * 2.32, 1.05, Math.sin(a) * 2.32); w.rotation.y = -a + Math.PI / 2; coreG.add(w); }
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0xbfe9ff, emissive: 0x2a6a90, emissiveIntensity: 0.35, transparent: true, opacity: 0.6, flatShading: true });
+    coreG.add(mesh(new THREE.SphereGeometry(1.9, 14, 8, 0, TAU, 0, Math.PI / 2), domeMat, 0, 2.2, 0));
+    const spireH = 2.4 + lv * 0.5;
+    coreG.add(mesh(Cyl(0.16, 0.32, spireH, 6), M(0xd6dcea), 0, 2.2 + spireH / 2, 0));
+    coreGem = mesh(new THREE.OctahedronGeometry(0.75 + lv * 0.1), M(0x7dffb0, 0x2bd47a, 0.9), 0, 2.2 + spireH + 0.9, 0);
+    coreG.add(coreGem);
+    for (let i = 0; i < lv; i++) {
+      const ring = mesh(new THREE.TorusGeometry(1.15 + i * 0.32, 0.05, 6, 40), glow(0x7dffb0, 0.8), 0, coreGem.position.y, 0);
+      ring.rotation.x = Math.PI / 2 + i * 0.5; coreRings.push(ring); coreG.add(ring);
+    }
+    // antenna + beacon
+    coreG.add(mesh(Cyl(0.05, 0.05, 2.6, 4), M(0xd6dcea), 2.0, 2.8, -0.9));
+    coreBeacon = mesh(new THREE.SphereGeometry(0.16, 8, 6), beaconMat, 2.0, 4.15, -0.9); coreG.add(coreBeacon);
+    // level flags
+    for (let i = 0; i < lv; i++) { const a = -Math.PI / 2 + (i - (lv - 1) / 2) * 0.35; coreG.add(mesh(Box(0.12, 0.5, 0.12), M(0xf2b84b), Math.cos(a) * 2.9, 0.75, Math.sin(a) * 2.9)); }
+    coreLight = new THREE.PointLight(0x7dffb0, 0.4, 20); coreLight.position.y = coreGem.position.y; coreG.add(coreLight);
+  }
+
+  // =============== astronauts ===============
+  function astronaut(accent, s) {
+    const g = new THREE.Group();
+    const suit = M(0xf2f4f8), acc = M(accent), dark = M(0x2c3446), gray = M(0xb9c2d4);
+    const hipL = new THREE.Group(), hipR = new THREE.Group(); hipL.position.set(-0.14, 0.52, 0); hipR.position.set(0.14, 0.52, 0);
+    hipL.add(mesh(Box(0.22, 0.5, 0.26), suit, 0, -0.25, 0)); hipR.add(mesh(Box(0.22, 0.5, 0.26), suit, 0, -0.25, 0));
+    hipL.add(mesh(Box(0.24, 0.12, 0.3), dark, 0, -0.47, 0.02)); hipR.add(mesh(Box(0.24, 0.12, 0.3), dark, 0, -0.47, 0.02));
+    g.add(hipL, hipR);
+    g.add(mesh(Box(0.62, 0.62, 0.4), suit, 0, 0.84, 0));
+    g.add(mesh(Box(0.64, 0.1, 0.42), acc, 0, 0.92, 0));
+    g.add(mesh(Box(0.64, 0.08, 0.42), dark, 0, 0.56, 0));
+    g.add(mesh(Box(0.22, 0.16, 0.06), glow(0x6fe3ff, 0.6), 0, 0.78, 0.21));
+    const shL = new THREE.Group(), shR = new THREE.Group(); shL.position.set(-0.4, 1.06, 0); shR.position.set(0.4, 1.06, 0);
+    shL.add(mesh(Box(0.17, 0.5, 0.2), suit, 0, -0.24, 0)); shR.add(mesh(Box(0.17, 0.5, 0.2), suit, 0, -0.24, 0));
+    shR.add(mesh(Box(0.12, 0.14, 0.5), dark, 0, -0.42, 0.2));
+    g.add(shL, shR);
+    g.add(mesh(new THREE.SphereGeometry(0.34, 12, 10), suit, 0, 1.42, 0));
+    const visor = mesh(new THREE.SphereGeometry(0.355, 12, 8, 0.67, 1.8, 0.95, 0.9), M(0xffb84a, 0x8a4a00, 0.6), 0, 1.42, 0.02);
+    g.add(visor);
+    g.add(mesh(Box(0.46, 0.55, 0.22), gray, 0, 0.9, -0.3));
+    g.add(mesh(Box(0.48, 0.08, 0.24), acc, 0, 1.0, -0.3));
+    g.add(mesh(Cyl(0.02, 0.02, 0.5, 4), dark, 0.15, 1.35, -0.34));
+    const tip = mesh(new THREE.SphereGeometry(0.05, 6, 4), beaconMat, 0.15, 1.62, -0.34); g.add(tip);
+    g.scale.setScalar(s);
+    return { g, hipL, hipR, shL, shR };
+  }
+  function animateWalk(a, moving, time, speed) {
+    const sw = moving ? Math.sin(time * speed) * 0.7 : 0;
+    a.hipL.rotation.x = sw; a.hipR.rotation.x = -sw; a.shL.rotation.x = -sw * 0.7;
+    a.shR.rotation.x = -0.9; // gun arm raised
+  }
+  const commander = astronaut(0xff8a3d, 1);
+  commander.lamp = new THREE.SpotLight(0xcfe8ff, 0, 18, 0.7, 0.5);
+  commander.lamp.position.set(0, 1.5, 0); commander.lamp.target.position.set(0, 0, 6);
+  commander.g.add(commander.lamp, commander.lamp.target);
+  scene.add(commander.g);
+  const player = commander.g;
+
+  // =============== buildings ===============
+  const buildings = [], colonos = [], aliens = [], bullets = [], shells = [], parts = [], scraps = [];
+  function buildMesh(t) {
+    const g = new THREE.Group(), o = { g };
+    if (t === 'muro') {
+      g.add(mesh(Box(1.9, 1.1, 0.7), M(0x8c97ad), 0, 0.55, 0));
+      g.add(mesh(Box(1.96, 0.16, 0.76), M(0x5d6880), 0, 1.14, 0));
+      g.add(mesh(Box(0.3, 0.3, 0.06), glow(0xf2b84b, 0.4), 0, 0.6, 0.36));
+    } else if (t === 'torreta') {
+      g.add(mesh(Cyl(0.7, 0.9, 0.5, 8), M(0x8c97ad), 0, 0.25, 0));
+      g.add(mesh(Cyl(0.22, 0.22, 0.5, 6), M(0x5d6880), 0, 0.7, 0));
+      const h = new THREE.Group(); h.position.y = 1.05;
+      h.add(mesh(Box(0.8, 0.45, 0.8), M(0xd6dcea)));
+      h.add(mesh(Box(0.82, 0.08, 0.82), M(0xf2b84b), 0, 0.2, 0));
+      [-0.16, 0.16].forEach((x) => { const b = mesh(Cyl(0.07, 0.07, 0.8, 6), M(0x2c3446), x, 0, 0.55); b.rotation.x = Math.PI / 2; h.add(b); });
+      g.add(h); o.head = h;
+    } else if (t === 'laser') {
+      g.add(mesh(Cyl(0.75, 0.9, 0.4, 6), M(0x6b7489), 0, 0.2, 0));
+      g.add(mesh(Cyl(0.22, 0.4, 2.1, 6), M(0xd6dcea), 0, 1.45, 0));
+      const ring = mesh(new THREE.TorusGeometry(0.45, 0.07, 6, 16), glow(0x6fe3ff, 0.9), 0, 2.55, 0); ring.rotation.x = Math.PI / 2; g.add(ring); o.ring = ring;
+      const tip = mesh(new THREE.OctahedronGeometry(0.26), glow(0x6fe3ff, 1.1), 0, 2.85, 0); g.add(tip); o.tip = tip;
+      const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
+      o.beam = new THREE.Line(bg, new THREE.LineBasicMaterial({ color: 0x9ff4ff })); o.beam.visible = false; o.beam.frustumCulled = false; scene.add(o.beam); o.beamT = 0;
+    } else if (t === 'mortero') {
+      g.add(mesh(Box(1.7, 0.5, 1.7), M(0x6b7489), 0, 0.25, 0));
+      g.add(mesh(Box(1.74, 0.1, 1.74), M(0xff9f5a), 0, 0.52, 0));
+      const h = new THREE.Group(); h.position.y = 0.75;
+      h.add(mesh(Cyl(0.55, 0.6, 0.45, 8), M(0x8c97ad)));
+      const tube = mesh(Cyl(0.22, 0.3, 1.2, 8), M(0x3b4458), 0, 0.45, 0.3); tube.rotation.x = 0.75; h.add(tube);
+      g.add(h); o.head = h;
+    } else if (t === 'mina') {
+      g.add(mesh(Box(1.7, 0.35, 1.7), M(0x6b7489), 0, 0.17, 0));
+      [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]].forEach(([x, z]) => g.add(mesh(Cyl(0.06, 0.06, 1.7, 4), M(0x5d6880), x, 1.15, z)));
+      g.add(mesh(Box(1.6, 0.16, 1.6), M(0xf2b84b), 0, 2.0, 0));
+      const drill = mesh(new THREE.ConeGeometry(0.38, 1.1, 6), M(0xd6dcea), 0, 0.95, 0); drill.rotation.x = Math.PI; g.add(drill); o.drill = drill;
+      const pile = mesh(new THREE.DodecahedronGeometry(0.4, 0), M(0xf2b84b, 0x7a4a00, 0.5), 0.95, 0.35, 0.95); g.add(pile); o.pile = pile;
+      const icon = mesh(new THREE.OctahedronGeometry(0.32), glow(0xf2b84b, 1), 0, 2.7, 0); g.add(icon); o.icon = icon;
+    } else if (t === 'habitat') {
+      g.add(mesh(Cyl(1.3, 1.4, 0.4, 12), M(0x6b7489), 0, 0.2, 0));
+      g.add(mesh(new THREE.SphereGeometry(1.18, 14, 8, 0, TAU, 0, Math.PI / 2), M(0xf2f4f8), 0, 0.4, 0));
+      g.add(mesh(Cyl(1.2, 1.2, 0.2, 14), glow(0x4fb8ff, 0.5), 0, 0.72, 0));
+      g.add(mesh(Box(0.55, 0.75, 0.3), M(0x2c3446), 0, 0.55, 1.12));
+      g.add(mesh(Box(0.6, 0.08, 0.34), M(0xff8a3d), 0, 0.96, 1.12));
+    }
+    return o;
+  }
+  function addBuilding(t, x, z, store) {
+    const d = DEF[t], o = buildMesh(t);
+    o.g.position.set(x, 0, z);
+    if (t === 'muro') o.g.rotation.y = Math.atan2(x, z);
+    else o.g.rotation.y = Math.atan2(-x, -z);
+    scene.add(o.g);
+    const b = Object.assign({ t, d, x, z, r: d.r, hp: d.hp, max: d.hp, cd: Math.random() * 0.5, store: store || 0, dead: false, flash: 0 }, o);
+    buildings.push(b);
+    if (t === 'habitat') { makeColono(b, -1); makeColono(b, 1); }
+    return b;
+  }
+  const rubbleMat = M(0x3a3f4d);
+  function destroyBuilding(b) {
+    b.dead = true; b.g.visible = false;
+    const r = new THREE.Group();
+    for (let i = 0; i < 5; i++) { const m = mesh(Box(0.35 + Math.random() * 0.3, 0.2, 0.35), rubbleMat, (Math.random() - 0.5) * 1.4, 0.1, (Math.random() - 0.5) * 1.4); m.rotation.y = Math.random() * 3; r.add(m); }
+    r.position.set(b.x, 0, b.z); scene.add(r); b.rubble = r;
+    burst(new THREE.Vector3(b.x, 1, b.z), 0xd6dcea, 16); S.shake = Math.max(S.shake, 0.25);
+    if (b.beam) b.beam.visible = false;
+  }
+  function restoreAll() {
+    for (const b of buildings) { if (b.rubble) { scene.remove(b.rubble); b.rubble = null; } b.dead = false; b.g.visible = true; b.hp = b.max; }
+    colonos.forEach((c) => { c.down = false; c.g.rotation.z = 0; });
+  }
+  function makeColono(home, side) {
+    const a = astronaut(0x4fb8ff, 0.72);
+    const c = Object.assign(a, { home, x: home.x + side * 1.8, z: home.z + 1.8, tx: home.x + side * 1.8, tz: home.z + 1.8, wait: Math.random() * 2, cd: 0, down: false, moving: false });
+    a.g.position.set(c.x, 0, c.z); scene.add(a.g); colonos.push(c);
+  }
+
+  // =============== aliens ===============
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff }), pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const hitMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  Object.entries(ALIEN).forEach(([k, d]) => {
+    d.mat = new THREE.MeshStandardMaterial({ color: d.col, emissive: d.col, emissiveIntensity: 0.75, flatShading: true });
+    d.geo = k === 'veloz' ? new THREE.ConeGeometry(d.r, d.r * 2.4, 5) : new THREE.IcosahedronGeometry(d.r, 0);
+  });
+  function spawnAlien(type) {
+    const d = ALIEN[type], g = new THREE.Group();
+    const body = mesh(d.geo, d.mat, 0, d.r, 0);
+    if (type === 'veloz') body.rotation.x = Math.PI / 2;
+    g.add(body);
+    [-1, 1].forEach((s) => {
+      g.add(mesh(new THREE.SphereGeometry(d.r * 0.2, 6, 5), eyeMat, s * d.r * 0.35, d.r * 1.25, d.r * 0.72));
+      g.add(mesh(new THREE.SphereGeometry(d.r * 0.09, 5, 4), pupilMat, s * d.r * 0.35, d.r * 1.25, d.r * 0.9));
+    });
+    if (type === 'jefe') for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; const sp = mesh(new THREE.ConeGeometry(0.22, 0.8, 5), M(0x7a2a10), Math.cos(a) * 0.9, d.r * 1.7, Math.sin(a) * 0.9); sp.rotation.z = Math.cos(a) * -0.5; sp.rotation.x = Math.sin(a) * 0.5; g.add(sp); }
+    const a = Math.random() * TAU;
+    g.position.set(Math.cos(a) * (ARENA + 4), 0, Math.sin(a) * (ARENA + 4));
+    scene.add(g);
+    const hp = d.hp * (1 + G.nights * 0.22);
+    aliens.push({ g, body, type, d, hp, flash: 0, bob: Math.random() * 6, tgt: null, retarget: 0 });
+  }
+  function pickTarget(a) {
+    let best = CORE_T, bd = dist2(a.g.position.x, a.g.position.z, 0, 0) - CORE_T.r;
+    for (const b of buildings) {
+      if (b.dead) continue;
+      let d = dist2(a.g.position.x, a.g.position.z, b.x, b.z) - b.r;
+      if (a.type === 'veloz' && !(b.t === 'mina' || b.t === 'habitat')) d += 7;
+      if (a.type === 'jefe' && !b.d.def) d += 7;
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+
+  // =============== effects ===============
+  const partGeo = Box(0.18, 0.18, 0.18), pMats = {};
+  function burst(pos, color, n) {
+    const mat = pMats[color] || (pMats[color] = new THREE.MeshBasicMaterial({ color }));
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(partGeo, mat); m.position.copy(pos);
+      const a = Math.random() * TAU, s = 2 + Math.random() * 4;
+      parts.push({ m, v: new THREE.Vector3(Math.cos(a) * s, 3 + Math.random() * 4, Math.sin(a) * s), life: 0.5 + Math.random() * 0.4 });
+      scene.add(m);
+    }
+  }
+  const bulletGeo = new THREE.SphereGeometry(0.13, 6, 6);
+  const BMAT = { player: new THREE.MeshBasicMaterial({ color: 0xffc38a }), turret: new THREE.MeshBasicMaterial({ color: 0xffd36e }), colono: new THREE.MeshBasicMaterial({ color: 0x9fd8ff }) };
+  function fire(fx, fy, fz, tx, tz, kind, dmg) {
+    const m = new THREE.Mesh(bulletGeo, BMAT[kind]); m.position.set(fx, fy, fz);
+    const v = new THREE.Vector3(tx - fx, 0, tz - fz); v.normalize().multiplyScalar(24);
+    scene.add(m); bullets.push({ m, v, dmg, life: 0.9 });
+  }
+  const shellMat = new THREE.MeshBasicMaterial({ color: 0xff9f5a });
+  function lob(b, tx, tz) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), shellMat);
+    m.position.set(b.x, 1.4, b.z); scene.add(m);
+    shells.push({ m, fx: b.x, fz: b.z, tx, tz, t: 0, dur: 0.9, dmg: b.d.dmg, area: b.d.area });
+  }
+
+  // =============== state ===============
+  let S = null, started = false;
+  const keys = new Set();
+  function coreMax() { return CORE[G.coreLv - 1].hp; }
+  function count(t) { return buildings.filter((b) => b.t === t).length; }
+  function limit(t) { return LIMITS[t][G.coreLv - 1]; }
+  function defenseScore() {
+    let s = 0;
+    for (const b of buildings) { if (b.d.def) s += b.d.def; if (b.t === 'muro') s += 0.1; }
+    return s + colonos.length * 0.4;
+  }
+  function spawnScraps(n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, r = 6 + Math.random() * (ARENA - 9);
+      const m = mesh(new THREE.DodecahedronGeometry(0.36, 0), M(0xf2b84b, 0x7a4a00, 0.6), Math.cos(a) * r, 0.45, Math.sin(a) * r);
+      scene.add(m); scraps.push({ m, ph: Math.random() * 6 });
+    }
+  }
+
+  // =============== UI helpers ===============
+  let toastTimer = 0, bannerTimer = 0;
+  function toast(text, kind) {
+    const el = $('#toast'); el.textContent = text; el.className = 'show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.className = kind || ''; }, 1800);
+  }
+  function banner(big, small) {
+    const el = $('#banner'); el.textContent = big;
+    if (small) { const s = document.createElement('small'); s.textContent = small; el.append(s); }
+    el.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+  const fmt = (t) => { const s = Math.max(0, Math.ceil(t)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function fmtDur(sec) { const m = Math.round(sec / 60); if (m < 60) return m + ' min'; const h = Math.floor(m / 60), r = m % 60; return h + ' h' + (r ? ' ' + r + ' min' : ''); }
+  function anyPanelOpen() { return !$('#corePanel').hidden || !$('#reportPanel').hidden || !$('#menuPanel').hidden || !$('#startScreen').hidden; }
+  function updateHint() {
+    if (!S) return;
+    let h;
+    if (S.placing) h = '';
+    else if (S.phase === 'day') h = (isTouch ? 'Arrastra el dedo para moverte' : 'WASD o flechas para moverte') + ' · Pasa cerca de las minas para recoger chatarra';
+    else h = 'Defiende la colonia · Tu astronauta y los colonos disparan solos';
+    $('#hint').textContent = h;
+  }
+  function hud() {
+    $('#scrap').textContent = Math.floor(G.scrap);
+    $('#crys').textContent = G.crys;
+    $('#colCount').textContent = colonos.length;
+    const max = coreMax(), pct = clamp(S.coreHp / max, 0, 1);
+    $('#coreLbl').textContent = 'Núcleo · nivel ' + G.coreLv;
+    $('#coreTxt').textContent = Math.ceil(Math.max(0, S.coreHp)) + ' / ' + max;
+    const bar = $('#coreBar'); bar.style.width = (pct * 100).toFixed(1) + '%'; bar.style.background = pct < 0.3 ? 'var(--danger)' : 'var(--core)';
+    const chip = $('#timerChip');
+    if (S.phase === 'day') {
+      chip.classList.remove('night'); $('#timerLbl').textContent = 'Próximo ataque en'; $('#timer').textContent = fmt(S.t);
+    } else {
+      chip.classList.add('night'); $('#timerLbl').textContent = '¡Ataque! · noche ' + S.wave.n;
+      $('#timer').textContent = (S.wave.total - S.spawned + aliens.length) + ' alienígenas';
+    }
+    $('#nightBtn').hidden = S.phase !== 'day';
+    $('#buildBtn').disabled = S.phase !== 'day';
+  }
+
+  // =============== shop & placement ===============
+  function openShop() {
+    if (!S || S.phase !== 'day') { toast('Solo puedes construir de día'); return; }
+    renderShop(); $('#shop').hidden = false;
+  }
+  function renderShop() {
+    const grid = $('#shopGrid'); grid.innerHTML = '';
+    for (const t of ORDER) {
+      const d = DEF[t], lim = limit(t), n = count(t), locked = G.coreLv < d.lock;
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'item';
+      const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = d.sw;
+      const name = document.createElement('strong'); name.textContent = d.name;
+      const desc = document.createElement('span'); desc.className = 'd'; desc.textContent = d.desc;
+      const meta = document.createElement('span'); meta.className = 'meta';
+      const c = document.createElement('span'); c.className = 'c'; const gm = document.createElement('span'); gm.className = 'gem scrap'; c.append(gm, document.createTextNode(String(d.cost)));
+      const right = document.createElement('span');
+      if (locked) { right.className = 'lock'; right.textContent = 'Núcleo nivel ' + d.lock; }
+      else right.textContent = n + ' / ' + lim;
+      meta.append(c, right);
+      btn.append(sw, name, desc, meta);
+      btn.disabled = locked || n >= lim || G.scrap < d.cost;
+      btn.setAttribute('aria-label', d.name + ', cuesta ' + d.cost + ' de chatarra' + (locked ? ', bloqueado' : ''));
+      btn.addEventListener('click', () => startPlacing(t));
+      grid.append(btn);
+    }
+  }
+  const ghost = new THREE.Group();
+  const ghostMat = new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: 0.45 });
+  const ghostBody = new THREE.Mesh(Cyl(1, 1, 1.2, 10), ghostMat); ghostBody.position.y = 0.6; ghost.add(ghostBody);
+  const ghostRing = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 72), new THREE.MeshBasicMaterial({ color: 0x6fe3ff, transparent: true, opacity: 0.35 }));
+  ghostRing.rotation.x = -Math.PI / 2; ghostRing.position.y = 0.06; ghost.add(ghostRing);
+  ghost.visible = false; scene.add(ghost);
+  function startPlacing(t) {
+    $('#shop').hidden = true; S.placing = t;
+    const d = DEF[t];
+    ghostBody.scale.set(d.r, 1, d.r); ghostRing.visible = !!d.range; if (d.range) ghostRing.scale.setScalar(d.range);
+    ghost.visible = false;
+    $('#placeTxt').textContent = 'Colocando: ' + d.name + ' · ' + (isTouch ? 'toca el suelo' : 'haz clic en el suelo');
+    $('#placeBar').hidden = false; $('#controls').hidden = true; updateHint();
+  }
+  function stopPlacing() { if (!S) return; S.placing = null; ghost.visible = false; $('#placeBar').hidden = true; $('#controls').hidden = false; updateHint(); }
+  const snap = (v) => Math.round(v / GRID) * GRID;
+  function placeProblem(t, x, z) {
+    const d = DEF[t];
+    if (Math.hypot(x, z) > ARENA - 1.5) return 'Fuera de la colonia: construye dentro del círculo';
+    if (Math.hypot(x, z) < CORE_T.r + d.r + 0.8) return 'Demasiado cerca del núcleo';
+    if (buildings.some((b) => dist2(b.x, b.z, x, z) < b.r + d.r - 0.2)) return 'Ya hay algo construido ahí';
+    if (count(t) >= limit(t)) return 'Límite alcanzado: mejora el núcleo para construir más';
+    if (G.scrap < d.cost) return 'Necesitas ' + d.cost + ' de chatarra';
+    return null;
+  }
+  function tryPlace(p) {
+    const t = S.placing, x = snap(p.x), z = snap(p.z), err = placeProblem(t, x, z);
+    if (err) { toast(err); return; }
+    G.scrap -= DEF[t].cost; addBuilding(t, x, z, 0);
+    burst(new THREE.Vector3(x, 0.6, z), 0x6fe3ff, 12);
+    persist();
+    if (count(t) >= limit(t) || G.scrap < DEF[t].cost) stopPlacing();
+  }
+
+  // =============== core panel ===============
+  function openCore() {
+    const lv = G.coreLv, cur = CORE[lv - 1], next = CORE[lv];
+    $('#cpTitle').textContent = 'Núcleo · nivel ' + lv;
+    const rows = $('#cpRows'); rows.innerHTML = '';
+    const addRow = (a, b) => { const r = document.createElement('div'); r.className = 'row'; const s1 = document.createElement('span'); s1.textContent = a; const s2 = document.createElement('span'); s2.textContent = b; r.append(s1, s2); rows.append(r); };
+    addRow('Vida del núcleo', cur.hp + (next ? '  →  ' + next.hp : ''));
+    addRow('Noches superadas', String(G.nights));
+    addRow('Viaje al Planeta Rojo', Math.min(G.nights, PLANET_GOAL) + ' / ' + PLANET_GOAL + ' noches');
+    const up = $('#cpUpgrade');
+    if (next) {
+      const unlocks = ORDER.filter((t) => DEF[t].lock === lv + 1).map((t) => DEF[t].name);
+      const more = ORDER.filter((t) => LIMITS[t][lv] > LIMITS[t][lv - 1] && DEF[t].lock <= lv).map((t) => DEF[t].name.toLowerCase());
+      $('#cpNext').textContent = 'Nivel ' + (lv + 1) + ': ' + (unlocks.length ? 'desbloquea ' + unlocks.join(' y ') + '. ' : '') + (more.length ? 'Permite más ' + more.join(', ') + '.' : '');
+      up.hidden = false;
+      up.innerHTML = '';
+      up.append(document.createTextNode('Mejorar · '));
+      const c1 = document.createElement('span'); c1.className = 'cost'; const g1 = document.createElement('span'); g1.className = 'gem scrap'; c1.append(g1, document.createTextNode(String(cur.s))); up.append(c1);
+      if (cur.c) { up.append(document.createTextNode('  ')); const c2 = document.createElement('span'); c2.className = 'cost'; const g2 = document.createElement('span'); g2.className = 'gem crystal'; c2.append(g2, document.createTextNode(String(cur.c))); up.append(c2); }
+      up.disabled = G.scrap < cur.s || G.crys < cur.c || S.phase !== 'day';
+    } else { $('#cpNext').textContent = 'Nivel máximo en este prototipo.'; up.hidden = true; }
+    $('#corePanel').hidden = false;
+  }
+  function upgradeCore() {
+    const cur = CORE[G.coreLv - 1];
+    if (!CORE[G.coreLv] || G.scrap < cur.s || G.crys < cur.c) return;
+    G.scrap -= cur.s; G.crys -= cur.c; G.coreLv++;
+    buildCore(G.coreLv); S.coreHp = coreMax();
+    burst(new THREE.Vector3(0, 4, 0), 0x7dffb0, 30);
+    persist(); openCore(); banner('NÚCLEO NIVEL ' + G.coreLv, 'Nuevos edificios y límites disponibles');
+  }
+
+  // =============== report ===============
+  function showReport(eyebrow, title, items) {
+    $('#rpEyebrow').textContent = eyebrow; $('#rpTitle').textContent = title;
+    const ul = $('#rpList'); ul.innerHTML = '';
+    items.forEach(([cls, text]) => { const li = document.createElement('li'); li.className = cls; li.textContent = text; ul.append(li); });
+    $('#reportPanel').hidden = false; $('#rpClose').focus();
+  }
+  function simulateAway(sec) {
+    const items = [];
+    let prod = 0;
+    for (const b of buildings) if (b.t === 'mina') { const add = Math.min(MINE_CAP - b.store, MINE_RATE * sec); if (add > 0) { b.store += add; prod += add; } }
+    if (prod >= 1) items.push(['gold', 'Tus minas han producido ' + Math.floor(prod) + ' de chatarra. Pasa cerca de ellas para recogerla.']);
+    const attacks = Math.min(3, Math.floor(sec / OFFLINE_EVERY));
+    for (let i = 0; i < attacks; i++) {
+      const n = G.nights + 1;
+      const def = defenseScore() + G.coreLv * 1.5, threat = 2 + n * 1.1;
+      const p = clamp(def / threat * 0.75, 0.1, 0.92);
+      if (Math.random() < p) { const r = 15 + n * 4; G.scrap += r; G.nights++; items.push(['good', 'Ataque ' + (i + 1) + ': tus defensas lo rechazaron. +' + r + ' de chatarra.']); }
+      else { const lost = Math.floor(G.scrap * 0.25); G.scrap -= lost; items.push(['bad', 'Ataque ' + (i + 1) + ': la colonia cayó. Perdiste ' + lost + ' de chatarra. Mejora tus defensas.']); }
+    }
+    if (!attacks) items.push(['', 'No ha habido ataques. Los alienígenas atacan cada ' + OFFLINE_EVERY / 60 + ' minutos mientras no juegas.']);
+    persist();
+    showReport('Informe de la colonia', 'Mientras no estabas (' + fmtDur(sec) + ')', items);
+    checkPlanet();
+  }
+  function checkPlanet() {
+    if (G.nights >= PLANET_GOAL && !G.planetShown) {
+      G.planetShown = true; persist();
+      setTimeout(() => showReport('¡Nave lista!', 'Rumbo al Planeta Rojo', [['good', 'Has superado ' + PLANET_GOAL + ' noches. Tu colonia puede viajar a otro planeta con amenazas nuevas.'], ['', 'El Planeta Rojo llegará en una próxima versión del prototipo.']]), 600);
+    }
+  }
+
+  // =============== phases ===============
+  function startDay() { S.phase = 'day'; S.t = DAY_LEN; mixTarget = 0; spawnScraps(3); updateHint(); }
+  function startNight() {
+    if (S.placing) stopPlacing();
+    $('#shop').hidden = true; $('#corePanel').hidden = true;
+    const n = G.nights + 1, total = Math.round(5 + n * 2.2 + defenseScore() * 0.6);
+    S.wave = { n, total, boss: n % 5 === 0 }; S.spawned = 0; S.spawnT = 0.6; S.phase = 'night'; mixTarget = 1;
+    if (S.wave.boss) { spawnAlien('jefe'); S.shake = 0.5; banner('NOCHE ' + n, '¡Viene un alienígena gigante!'); }
+    else banner('NOCHE ' + n, 'Protege el núcleo hasta el amanecer');
+    updateHint();
+  }
+  function clearAliens() {
+    aliens.forEach((a) => { burst(a.g.position.clone().setY(0.8), a.d.col, 4); scene.remove(a.g); }); aliens.length = 0;
+    bullets.forEach((b) => scene.remove(b.m)); bullets.length = 0;
+    shells.forEach((s) => scene.remove(s.m)); shells.length = 0;
+  }
+  function dawn(win) {
+    clearAliens(); restoreAll(); S.coreHp = coreMax();
+    if (win) {
+      const n = S.wave.n, rs = 25 + n * 8, rc = 1 + (n % 3 === 0 ? 1 : 0);
+      G.nights++; G.scrap += rs; G.crys += rc;
+      banner('AMANECE', 'Noche ' + n + ' superada · +' + rs + ' chatarra · +' + rc + ' cristales');
+    } else {
+      const lost = Math.floor(G.scrap * 0.3); G.scrap -= lost;
+      banner('LA COLONIA HA CAÍDO', 'Pierdes ' + lost + ' de chatarra · Reconstruyendo al amanecer');
+    }
+    persist(); startDay(); checkPlanet();
+  }
+
+  // =============== input ===============
+  window.addEventListener('keydown', (e) => {
+    if (!started || !S) return;
+    const k = e.key.toLowerCase();
+    if (k === 'escape') { if (S.placing) stopPlacing(); $('#shop').hidden = true; $('#corePanel').hidden = true; $('#menuPanel').hidden = true; return; }
+    if (anyPanelOpen()) return;
+    keys.add(k);
+    if (k === 'b') { if ($('#shop').hidden) openShop(); else $('#shop').hidden = true; }
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  window.addEventListener('blur', () => keys.clear());
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  function groundPoint(x, y) {
+    ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+    const out = new THREE.Vector3(); return ray.ray.intersectPlane(floor, out) ? out : null;
+  }
+  let joy = null;
+  const stick = $('#stick'), knob = $('#knob');
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!started || !S || anyPanelOpen()) return;
+    if (!$('#shop').hidden) { $('#shop').hidden = true; return; }
+    if (S.placing) { const p = groundPoint(e.clientX, e.clientY); if (p) tryPlace(p); return; }
+    joy = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px'; knob.style.transform = ''; stick.hidden = false;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (S && S.placing && !isTouch) {
+      const p = groundPoint(e.clientX, e.clientY);
+      if (p) { const x = snap(p.x), z = snap(p.z); ghost.position.set(x, 0, z); ghost.visible = true; ghostMat.color.set(placeProblem(S.placing, x, z) ? 0xff6b5e : 0x7dffb0); }
+    }
+    if (joy && e.pointerId === joy.id) {
+      let dx = (e.clientX - joy.x) / 50, dy = (e.clientY - joy.y) / 50; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
+      joy.dx = dx; joy.dy = dy; knob.style.transform = 'translate(' + dx * 34 + 'px,' + dy * 34 + 'px)';
+    }
+  });
+  const endJoy = (e) => { if (joy && e.pointerId === joy.id) { joy = null; stick.hidden = true; } };
+  canvas.addEventListener('pointerup', endJoy); canvas.addEventListener('pointercancel', endJoy);
+
+  $('#buildBtn').addEventListener('click', openShop);
+  $('#shopClose').addEventListener('click', () => { $('#shop').hidden = true; });
+  $('#placeDone').addEventListener('click', stopPlacing);
+  $('#coreBtn').addEventListener('click', openCore);
+  $('#cpClose').addEventListener('click', () => { $('#corePanel').hidden = true; });
+  $('#cpUpgrade').addEventListener('click', upgradeCore);
+  $('#nightBtn').addEventListener('click', () => { if (S && S.phase === 'day') startNight(); });
+  $('#rpClose').addEventListener('click', () => { $('#reportPanel').hidden = true; });
+  $('#menuBtn').addEventListener('click', () => { $('#resetConfirm').hidden = true; $('#resetBox').hidden = false; $('#menuPanel').hidden = false; });
+  $('#menuClose').addEventListener('click', () => { $('#menuPanel').hidden = true; });
+  $('#simBtn').addEventListener('click', () => { $('#menuPanel').hidden = true; if (S.phase === 'night') dawn(true); simulateAway(2 * 3600); });
+  $('#resetBtn').addEventListener('click', () => { $('#resetBox').hidden = true; $('#resetConfirm').hidden = false; });
+  $('#resetNo').addEventListener('click', () => { $('#resetConfirm').hidden = true; $('#resetBox').hidden = false; });
+  $('#resetYes').addEventListener('click', () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); });
+  if (isTouch) $('#moveHelp').textContent = 'Arrastra el dedo por la pantalla.';
+  if (!isNew) $('#startBtn').textContent = 'Volver a la colonia';
+
+  // =============== boot ===============
+  buildCore(G.coreLv);
+  if (isNew) {
+    [[-6, 4], [6, 4], [-6, -4], [6, -4]].forEach(([x, z]) => addBuilding('muro', x, z));
+    addBuilding('torreta', 0, 6); addBuilding('mina', -8, 0);
+    G.scrap = 140;
+  } else {
+    G.buildings.forEach((b) => { if (DEF[b.t]) addBuilding(b.t, b.x, b.z, b.store); });
+  }
+  const awaySec = isNew ? 0 : (Date.now() - (G.lastSeen || Date.now())) / 1000;
+  S = { phase: 'day', t: DAY_LEN, coreHp: coreMax(), wave: null, spawned: 0, spawnT: 0, placing: null, shake: 0 };
+  player.position.set(0, 0, 6);
+  spawnScraps(3);
+  $('#startBtn').addEventListener('click', () => {
+    $('#startScreen').hidden = true; $('#hud').hidden = false; $('#controls').hidden = false; started = true;
+    updateHint(); persist();
+    if (awaySec > 120) simulateAway(awaySec);
+    else banner('DÍA ' + (G.nights + 1), 'Prepara la colonia antes del ataque');
+  });
+  setInterval(() => { if (started) persist(); }, 5000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && started) persist(); });
+  window.addEventListener('pagehide', () => { if (started) persist(); });
+
+  // =============== update ===============
+  function nearestAlien(x, z, range, minR) {
+    let best = null, bd = range;
+    for (const a of aliens) { const d = dist2(a.g.position.x, a.g.position.z, x, z) - a.d.r; if (d < bd && (!minR || d > minR)) { bd = d; best = a; } }
+    return best;
+  }
+  function hurtAlien(a, dmg) {
+    a.hp -= dmg; a.flash = 0.08;
+    if (a.hp <= 0) {
+      G.scrap += a.d.drop; G.crys += a.d.cry;
+      burst(a.g.position.clone().setY(a.d.r), a.d.col, a.type === 'jefe' ? 30 : 8);
+      if (a.type === 'jefe') { toast('¡Jefe derrotado! +' + a.d.cry + ' cristales', 'good'); S.shake = 0.4; }
+      scene.remove(a.g); aliens.splice(aliens.indexOf(a), 1);
+    }
+  }
+  function pushOut(o, x, z, r) {
+    const dx = o.position.x - x, dz = o.position.z - z, d = Math.hypot(dx, dz);
+    if (d < r && d > 0.001) { o.position.x = x + dx / d * r; o.position.z = z + dz / d * r; }
+  }
+  let playerCd = 0;
+  function update(dt, time) {
+    // ambient animation
+    if (coreGem) { coreGem.rotation.y += dt; coreGem.position.y += Math.sin(time * 2) * 0.004; }
+    coreRings.forEach((r, i) => { r.rotation.z += dt * (0.6 + i * 0.25) * (i % 2 ? -1 : 1); });
+    if (coreBeacon) coreBeacon.visible = Math.sin(time * 4) > -0.3;
+    for (const s of scraps) { s.m.rotation.y += dt * 1.5; s.m.position.y = 0.45 + Math.sin(time * 3 + s.ph) * 0.08; }
+    mix += (mixTarget - mix) * Math.min(1, dt * 1.2);
+    applyPalette();
+    for (const b of buildings) {
+      if (b.t === 'mina') {
+        if (b.drill) b.drill.rotation.y += dt * 6;
+        b.pile.scale.setScalar(0.4 + (b.store / MINE_CAP) * 1.1);
+        b.icon.visible = b.store >= 10 && !b.dead; b.icon.position.y = 2.7 + Math.sin(time * 3 + b.x) * 0.15; b.icon.rotation.y += dt * 2;
+      }
+      if (b.ring) b.ring.rotation.z += dt * 2;
+      if (b.beam && b.beamT > 0) { b.beamT -= dt; if (b.beamT <= 0) b.beam.visible = false; }
+    }
+    if (!started || !S) return;
+    if (anyPanelOpen()) return; // pause while reading panels
+
+    // mines produce
+    for (const b of buildings) if (b.t === 'mina' && !b.dead) b.store = Math.min(MINE_CAP, b.store + MINE_RATE * dt);
+
+    // clock
+    if (S.phase === 'day') { S.t -= dt; if (S.t <= 0) startNight(); }
+    else {
+      S.spawnT -= dt;
+      if (S.spawned < S.wave.total && S.spawnT <= 0) {
+        spawnAlien(Math.random() < Math.min(0.35, 0.05 * S.wave.n + 0.05) ? 'veloz' : 'bicho');
+        S.spawned++; S.spawnT = SPAWN_WINDOW / S.wave.total;
+      }
+      if (S.spawned >= S.wave.total && aliens.length === 0) { dawn(true); return; }
+    }
+
+    // commander
+    let mx = 0, mz = 0;
+    if (keys.has('w') || keys.has('arrowup')) mz -= 1;
+    if (keys.has('s') || keys.has('arrowdown')) mz += 1;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+    if (keys.has('d') || keys.has('arrowright')) mx += 1;
+    if (joy) { mx += joy.dx; mz += joy.dy; }
+    const ml = Math.hypot(mx, mz), moving = ml > 0.05;
+    if (moving) { const k = Math.min(1, ml) / ml * 7.5 * dt; player.position.x += mx * k; player.position.z += mz * k; }
+    const pr = Math.hypot(player.position.x, player.position.z);
+    if (pr > ARENA - 0.8) { player.position.x *= (ARENA - 0.8) / pr; player.position.z *= (ARENA - 0.8) / pr; }
+    pushOut(player, 0, 0, CORE_T.r + 0.5);
+    for (const b of buildings) if (!b.dead) pushOut(player, b.x, b.z, b.r + 0.45);
+    animateWalk(commander, moving, time, 11);
+    // collect
+    for (let i = scraps.length - 1; i >= 0; i--) {
+      const s = scraps[i];
+      if (dist2(s.m.position.x, s.m.position.z, player.position.x, player.position.z) < 1.4) { G.scrap += 8; burst(s.m.position, 0xf2b84b, 6); scene.remove(s.m); scraps.splice(i, 1); }
+    }
+    for (const b of buildings) {
+      if (b.t === 'mina' && !b.dead && b.store >= 5 && dist2(b.x, b.z, player.position.x, player.position.z) < b.r + 1.6) {
+        const n = Math.floor(b.store); G.scrap += n; b.store -= n; burst(new THREE.Vector3(b.x, 1.5, b.z), 0xf2b84b, 8); toast('+' + n + ' de chatarra', 'gold');
+      }
+    }
+    // commander fires
+    playerCd -= dt;
+    const pt = nearestAlien(player.position.x, player.position.z, PLAYER_RANGE);
+    if (pt) {
+      player.rotation.y = Math.atan2(pt.g.position.x - player.position.x, pt.g.position.z - player.position.z);
+      if (playerCd <= 0) { fire(player.position.x, 1.1, player.position.z, pt.g.position.x, pt.g.position.z, 'player', 1); playerCd = 0.3; }
+    } else if (moving) player.rotation.y = Math.atan2(mx, mz);
+
+    // colonos
+    for (const c of colonos) {
+      if (c.down) continue;
+      let gx = c.tx, gz = c.tz, speed = 3;
+      const foe = S.phase === 'night' ? nearestAlien(c.home.x, c.home.z, 10) : null;
+      if (foe) {
+        const d = dist2(foe.g.position.x, foe.g.position.z, c.g.position.x, c.g.position.z);
+        c.g.rotation.y = Math.atan2(foe.g.position.x - c.g.position.x, foe.g.position.z - c.g.position.z);
+        if (d > 4.5) { gx = foe.g.position.x; gz = foe.g.position.z; speed = 4.5; } else { gx = c.g.position.x; gz = c.g.position.z; }
+        c.cd -= dt;
+        if (c.cd <= 0 && d < 5.5) { fire(c.g.position.x, 0.8, c.g.position.z, foe.g.position.x, foe.g.position.z, 'colono', 0.6); c.cd = 0.7; }
+      } else {
+        c.wait -= dt;
+        if (c.wait <= 0 && dist2(c.g.position.x, c.g.position.z, c.tx, c.tz) < 0.3) {
+          const a = Math.random() * TAU, r = 2 + Math.random() * 2.5; c.tx = c.home.x + Math.cos(a) * r; c.tz = c.home.z + Math.sin(a) * r; c.wait = 1.5 + Math.random() * 3;
+        }
+        gx = c.tx; gz = c.tz;
+      }
+      const dx = gx - c.g.position.x, dz = gz - c.g.position.z, d = Math.hypot(dx, dz);
+      c.moving = d > 0.25;
+      if (c.moving) { c.g.position.x += dx / d * speed * dt; c.g.position.z += dz / d * speed * dt; if (!foe) c.g.rotation.y = Math.atan2(dx, dz); }
+      pushOut(c.g, 0, 0, CORE_T.r + 0.4);
+      animateWalk(c, c.moving, time + c.home.x, 12);
+    }
+
+    // defenses
+    for (const b of buildings) {
+      if (b.dead || !b.d.range) continue;
+      b.cd -= dt;
+      const a = nearestAlien(b.x, b.z, b.d.range, b.d.min);
+      if (!a) continue;
+      const ang = Math.atan2(a.g.position.x - b.x, a.g.position.z - b.z);
+      if (b.head) b.head.rotation.y = ang - b.g.rotation.y;
+      if (b.cd > 0) continue;
+      b.cd = b.d.rate;
+      if (b.t === 'torreta') fire(b.x, 1.1, b.z, a.g.position.x, a.g.position.z, 'turret', b.d.dmg);
+      else if (b.t === 'laser') {
+        const pos = b.beam.geometry.attributes.position;
+        pos.setXYZ(0, b.x, 2.85, b.z); pos.setXYZ(1, a.g.position.x, a.d.r, a.g.position.z); pos.needsUpdate = true;
+        b.beam.visible = true; b.beamT = 0.06; hurtAlien(a, b.d.dmg);
+      } else if (b.t === 'mortero') lob(b, a.g.position.x, a.g.position.z);
+    }
+
+    // aliens
+    for (let i = aliens.length - 1; i >= 0; i--) {
+      const a = aliens[i], p = a.g.position;
+      a.retarget -= dt;
+      if (!a.tgt || a.tgt.dead || a.retarget <= 0) { a.tgt = pickTarget(a); a.retarget = 0.8; }
+      const tg = a.tgt, dx = tg.x - p.x, dz = tg.z - p.z, d = Math.hypot(dx, dz);
+      a.g.rotation.y = Math.atan2(dx, dz);
+      if (d > tg.r + a.d.r + 0.35) { p.x += dx / d * a.d.spd * dt; p.z += dz / d * a.d.spd * dt; }
+      else if (tg === CORE_T) { S.coreHp -= a.d.dps * dt; if (Math.random() < dt * 4) burst(new THREE.Vector3(p.x * 0.6, 1.5, p.z * 0.6), 0x7dffb0, 1); }
+      else { tg.hp -= a.d.dps * dt; if (tg.hp <= 0 && !tg.dead) destroyBuilding(tg); }
+      a.body.position.y = a.d.r + Math.abs(Math.sin(time * 6 + a.bob)) * 0.15;
+      if (a.type !== 'veloz') a.body.rotation.y += dt * 2;
+      if (a.flash > 0) { a.flash -= dt; a.body.material = a.flash > 0 ? hitMat : a.d.mat; }
+    }
+    if (S.coreHp <= 0) { dawn(false); return; }
+
+    // bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.m.position.addScaledVector(b.v, dt); b.life -= dt;
+      let hit = null;
+      for (const a of aliens) if (dist2(a.g.position.x, a.g.position.z, b.m.position.x, b.m.position.z) < a.d.r + 0.25) { hit = a; break; }
+      if (hit) hurtAlien(hit, b.dmg);
+      if (hit || b.life <= 0) { scene.remove(b.m); bullets.splice(i, 1); }
+    }
+    for (let i = shells.length - 1; i >= 0; i--) {
+      const s = shells[i]; s.t += dt / s.dur;
+      const k = Math.min(1, s.t);
+      s.m.position.set(s.fx + (s.tx - s.fx) * k, 1.4 + Math.sin(Math.PI * k) * 6, s.fz + (s.tz - s.fz) * k);
+      if (s.t >= 1) {
+        burst(new THREE.Vector3(s.tx, 0.3, s.tz), 0xff9f5a, 14);
+        aliens.slice().forEach((a) => { if (dist2(a.g.position.x, a.g.position.z, s.tx, s.tz) < s.area + a.d.r) hurtAlien(a, s.dmg); });
+        scene.remove(s.m); shells.splice(i, 1);
+      }
+    }
+  }
+  function updateParts(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.v.y -= 14 * dt; p.m.position.addScaledVector(p.v, dt);
+      if (p.m.position.y < 0.05) { p.m.position.y = 0.05; p.v.multiplyScalar(0.5); p.v.y *= -0.3; }
+      p.life -= dt; p.m.scale.setScalar(Math.max(0.01, p.life * 1.5));
+      if (p.life <= 0) { scene.remove(p.m); parts.splice(i, 1); }
+    }
+  }
+  const look = new THREE.Vector3(), camGoal = new THREE.Vector3();
+  function updateCamera(dt, time) {
+    if (started) look.set(player.position.x * 0.6, 0, player.position.z * 0.6);
+    else look.set(Math.sin(time * 0.12) * 4, 0, Math.cos(time * 0.12) * 4);
+    camGoal.set(look.x, 25 * camScale, look.z + 16 * camScale);
+    camera.position.lerp(camGoal, Math.min(1, dt * 4));
+    if (S && S.shake > 0) { S.shake -= dt; if (!reduceMotion) { camera.position.x += (Math.random() - 0.5) * S.shake; camera.position.z += (Math.random() - 0.5) * S.shake; } }
+    camera.lookAt(camera.position.x, 0, camera.position.z - 16 * camScale);
+  }
+
+  // =============== loop ===============
+  const clock = new THREE.Clock();
+  camera.position.set(0, 25, 16);
+  let hudT = 0;
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(0.05, clock.getDelta()), time = clock.elapsedTime;
+    update(dt, time); updateParts(dt); updateCamera(dt, time);
+    hudT -= dt; if (started && hudT <= 0) { hud(); hudT = 0.1; }
+    renderer.render(scene, camera);
+  });
+})();
+</script>
+</body>
+</html>
