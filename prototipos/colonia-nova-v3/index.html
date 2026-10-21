@@ -294,8 +294,8 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
   const LIMITS = { muro: [10, 16, 24, 32, 40], torreta: [2, 3, 4, 5, 6], mina: [1, 2, 3, 3, 4], habitat: [0, 1, 2, 2, 3], cuartel: [0, 1, 1, 1, 1], laser: [0, 1, 2, 2, 3], mortero: [0, 0, 1, 2, 2] };
   const CORE = [{ hp: 120, s: 150, c: 0 }, { hp: 180, s: 350, c: 3 }, { hp: 260, s: 700, c: 6 }, { hp: 350, s: 1100, c: 10 }, { hp: 450 }];
   const TROOP = {
-    soldado:   { name: 'Soldado', desc: 'Dispara a los alienígenas cercanos.', cost: 30, hp: 35, dmg: 0.8, rate: 0.5, range: 6, accent: 0xe0483e },
-    ingeniero: { name: 'Ingeniero', desc: 'Repara edificios y el núcleo mientras luchas.', cost: 40, hp: 25, dmg: 0.4, rate: 0.9, range: 5, repair: 9, accent: 0xf2b84b }
+    soldado:   { name: 'Soldado', desc: 'Dispara a los alienígenas cercanos.', cost: 30, hp: 50, dmg: 0.8, rate: 0.5, range: 6, accent: 0xe0483e },
+    ingeniero: { name: 'Ingeniero', desc: 'Repara edificios y el núcleo mientras luchas.', cost: 40, hp: 35, dmg: 0.4, rate: 0.9, range: 5, repair: 9, accent: 0xf2b84b }
   };
   const ALIEN = {
     bicho:     { name: 'Bicho', desc: 'Va a por tus edificios.', r: 0.5, hp: 3, spd: 2.3, dmg: 5, rate: 0.8, col: 0xff4fd8, drop: 2, cry: 0 },
@@ -536,7 +536,7 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
   const player = CMD.g;
 
   // ======================= runtime collections =======================
-  const buildings = [], troops = [], workers = [], aliens = [], bullets = [], acids = [], shells = [], parts = [], scraps = [], shards = [], meteors = [];
+  const fallen = [], buildings = [], troops = [], workers = [], aliens = [], bullets = [], acids = [], shells = [], parts = [], scraps = [], shards = [], meteors = [];
   let S = null, started = false;
 
   // ======================= effects =======================
@@ -587,10 +587,9 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
       banner('HAS CAÍDO', 'Tu comandante vuelve al núcleo en 8 segundos'); S.shake = 0.4;
       return;
     }
-    u.dead = true; scene.remove(u.g); killBar(u.bar);
-    troops.splice(troops.indexOf(u), 1);
-    toast('Has perdido un ' + TROOP[u.type].name.toLowerCase());
-    persist();
+    u.dead = true; u.g.visible = false; u.bar.g.visible = false;
+    troops.splice(troops.indexOf(u), 1); fallen.push(u);
+    toast('Tu ' + TROOP[u.type].name.toLowerCase() + ' está herido · vuelve al amanecer');
   }
 
   // ======================= buildings =======================
@@ -729,7 +728,7 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
   }
   function trainTroop(type) {
     const c = barracks(), td = TROOP[type];
-    if (!c || troops.length >= troopCap() || G.scrap < td.cost) return;
+    if (!c || troops.length + fallen.length >= troopCap() || G.scrap < td.cost) return;
     G.scrap -= td.cost;
     spawnTroop(type, c.x + (Math.random() - 0.5) * 2, c.z + 2.2);
     burst(V(c.x, 1.2, c.z + 1.5), td.accent, 10);
@@ -899,7 +898,7 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
   // ======================= persistence =======================
   function persist() {
     G.buildings = buildings.map((b) => ({ t: b.t, x: b.x, z: b.z, lv: b.lv, store: Math.floor(b.store || 0) }));
-    G.troops = { soldado: troops.filter((t) => t.type === 'soldado').length, ingeniero: troops.filter((t) => t.type === 'ingeniero').length };
+    const all = troops.concat(fallen); G.troops = { soldado: all.filter((t) => t.type === 'soldado').length, ingeniero: all.filter((t) => t.type === 'ingeniero').length };
     G.lastSeen = Date.now();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {}
   }
@@ -939,8 +938,8 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
   function hud() {
     $('#scrap').textContent = Math.floor(G.scrap);
     $('#crys').textContent = G.crys;
-    $('#troopChip').hidden = !barracks() && !troops.length;
-    $('#troopCount').textContent = troops.length + ' / ' + troopCap();
+    $('#troopChip').hidden = !barracks() && !troops.length && !fallen.length;
+    $('#troopCount').textContent = troops.length + (fallen.length ? ' (+' + fallen.length + ' heridos)' : '') + ' / ' + troopCap();
     const max = coreMax(), pct = clamp(S.coreHp / max, 0, 1);
     $('#coreLbl').textContent = 'Núcleo · nivel ' + G.coreLv;
     $('#coreTxt').textContent = Math.ceil(Math.max(0, S.coreHp)) + ' / ' + max;
@@ -954,7 +953,7 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
     }
     $('#nightBtn').hidden = S.phase !== 'day';
     $('#buildBtn').disabled = S.phase !== 'day';
-    const sq = $('#squadBtn'); sq.hidden = !troops.length;
+    const sq = $('#squadBtn'); sq.hidden = !troops.length && !fallen.length;
     sq.textContent = 'Escuadrón: ' + (S.squad === 'follow' ? 'te sigue' : 'defiende aquí');
   }
 
@@ -1067,19 +1066,19 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
     if (b.t === 'habitat') addRow(rows, 'Colonos', String(WORKERS[b.lv - 1]));
     const train = $('#bpTrain'); train.innerHTML = ''; train.hidden = b.t !== 'cuartel';
     if (b.t === 'cuartel') {
-      const h = el('h4', null, 'Entrenar tropas'); h.append(el('span', null, troops.length + ' / ' + troopCap())); train.append(h);
+      const h = el('h4', null, 'Entrenar tropas'); h.append(el('span', null, (troops.length + fallen.length) + ' / ' + troopCap())); train.append(h);
       const grid = el('div', 'train-grid');
       for (const [type, td] of Object.entries(TROOP)) {
         const btn = el('button', 'item'); btn.type = 'button';
         const sw = el('span', 'sw'); sw.style.background = '#' + td.accent.toString(16).padStart(6, '0');
         const meta = el('span', 'meta'); meta.append(costNode(td.cost, 0), el('span', null, String(troops.filter((t) => t.type === type).length)));
         btn.append(sw, el('strong', null, td.name), el('span', 'd', td.desc), meta);
-        btn.disabled = b.dead || troops.length >= troopCap() || G.scrap < td.cost;
+        btn.disabled = b.dead || troops.length + fallen.length >= troopCap() || G.scrap < td.cost;
         btn.addEventListener('click', () => { trainTroop(type); openBuilding(b); });
         grid.append(btn);
       }
       train.append(grid);
-      if (troops.length >= troopCap()) train.append(el('p', 'muted', 'Cuartel lleno. Mejóralo para tener más tropas.'));
+      if (troops.length + fallen.length >= troopCap()) train.append(el('p', 'muted', 'Cuartel lleno. Mejóralo para tener más tropas.'));
     }
     const up = $('#bpUpgrade');
     if (b.lv >= 3) { $('#bpNext').textContent = 'Nivel máximo.'; up.hidden = true; }
@@ -1239,6 +1238,8 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
   function dawn(win) {
     clearHostiles(); clearRifts(); restoreAll(); S.coreHp = coreMax();
     if (CMD.dead) respawnCmd();
+    const bk = barracks();
+    fallen.splice(0).forEach((u) => { u.dead = false; u.hp = u.max; u.g.visible = true; u.g.position.set((bk ? bk.x : 0) + (Math.random() - 0.5) * 2, 0, (bk ? bk.z : 4) + 2.5); troops.push(u); });
     if (win) {
       const n = S.wave.n, rs = 25 + n * 8, rc = 1 + (n % 3 === 0 ? 1 : 0);
       G.nights++; G.scrap += rs; G.crys += rc;
@@ -1749,7 +1750,7 @@ h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: sp
     hudT -= dt; if (started && hudT <= 0) { hud(); hudT = 0.1; }
     renderer.render(scene, camera);
   });
-  window.__cn = { G, S: () => S, buildings, aliens, troops, workers, CMD, startNight, dawn, spawnAlien, startMeteors, trainTroop, addBuilding, openBuilding };
+  window.__cn = { fallen, G, S: () => S, buildings, aliens, troops, workers, CMD, startNight, dawn, spawnAlien, startMeteors, trainTroop, addBuilding, openBuilding };
 })();
 </script>
 </body>

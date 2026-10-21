@@ -9,3 +9,4 @@
 - Exploración fuera de la colonia: yacimientos de cristal, nido alienígena y restos de nave.
 - Portales que avisan por dónde atacarán y lluvia de meteoritos.
 - Barras de vida en edificios, tropas, comandante, jefes y nido.
+- Las tropas caídas vuelven heridas al amanecer; soldados e ingenieros más resistentes.
