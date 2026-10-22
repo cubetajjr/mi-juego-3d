@@ -1,0 +1,2276 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Colonia Nova</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: full-bleed 3D canvas; HUD pinned to safe edges; bottom sheet for the shop; centered panels. Single dark look on purpose (a colony console). */
+:root {
+  --void: #0a0e1a;
+  --panel: rgba(13, 19, 34, 0.84);
+  --panel-solid: #111a2e;
+  --raise: rgba(255, 255, 255, 0.05);
+  --line: rgba(150, 180, 255, 0.24);
+  --ink: #e9eefb;
+  --dim: #9aa6c2;
+  --scrap: #f2b84b;
+  --crystal: #6fe3ff;
+  --alien: #ff4fd8;
+  --core: #7dffb0;
+  --danger: #ff6b5e;
+  --f-display: 'Chakra Petch', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --f-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--void); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#hurt { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; box-shadow: inset 0 0 140px 30px rgba(255, 60, 60, 0.85); }
+#pops { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.pop { position: absolute; transform: translate(-50%, -50%); font-family: var(--f-display); font-weight: 700; font-size: 17px; text-shadow: 0 2px 6px rgba(0,0,0,0.8); animation: rise 0.95s ease-out forwards; white-space: nowrap; }
+.pop.gold { color: var(--scrap); }
+.pop.crys { color: var(--crystal); font-size: 19px; }
+.pop.big { font-size: 24px; }
+@keyframes rise { 0% { opacity: 0; margin-top: 6px; } 15% { opacity: 1; } 100% { opacity: 0; margin-top: -46px; } }
+.bump { animation: bump 0.25s ease-out; }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+.hud {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: flex-start; pointer-events: none;
+}
+.group { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+.chip {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 11px; display: flex; align-items: center; gap: 9px;
+  font-family: var(--f-display); font-variant-numeric: tabular-nums; backdrop-filter: blur(6px);
+}
+.stat { font-size: 15px; font-weight: 700; }
+.stat span { display: inline-block; }
+small.lbl { display: block; font-family: var(--f-body); font-weight: 400; font-size: 10.5px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+.gem { width: 12px; height: 12px; transform: rotate(45deg); border-radius: 2px; flex: none; display: inline-block; }
+.gem.scrap { background: var(--scrap); }
+.gem.crystal { background: var(--crystal); }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: #e0483e; flex: none; }
+.timer { flex-direction: column; align-items: center; gap: 0; padding: 7px 16px; min-width: 190px; }
+.timer strong { font-size: 24px; line-height: 1.1; }
+.timer.night { border-color: var(--alien); }
+.timer.night strong { color: var(--alien); }
+.hazard { font-family: var(--f-body); font-size: 11.5px; color: var(--scrap); margin-top: 2px; text-align: center; }
+.corechip { min-width: 150px; flex-direction: column; align-items: stretch; gap: 3px; }
+.bar { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; background: var(--core); transition: width 0.15s linear; }
+.iconbtn { pointer-events: auto; min-width: 44px; padding: 0 12px; font-size: 20px; line-height: 1; }
+
+.controls {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+}
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.hint { font-size: 12.5px; color: var(--dim); text-align: center; text-wrap: balance; text-shadow: 0 1px 2px rgba(0,0,0,0.7); max-width: 60ch; }
+button {
+  pointer-events: auto; cursor: pointer;
+  font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: 0.04em;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 15px; min-height: 44px;
+}
+button:hover { border-color: var(--crystal); }
+button:focus-visible { outline: 2px solid var(--crystal); outline-offset: 2px; }
+button.primary { background: var(--core); color: #06210f; border-color: var(--core); }
+button.warn { border-color: var(--alien); }
+button.squad { border-color: #e0483e; }
+button.ship { border-color: var(--crystal); }
+button.ship.ready { background: var(--crystal); color: #04202a; }
+button.danger { border-color: var(--danger); color: var(--danger); }
+button[disabled] { opacity: 0.42; cursor: not-allowed; }
+
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
+  background: var(--panel-solid); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0;
+  padding-top: 14px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  max-height: 64%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+}
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; max-width: 920px; width: 100%; margin: 0 auto; }
+.sheet-head h3 { margin: 0; font-family: var(--f-display); font-size: 20px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; max-width: 920px; width: 100%; margin: 0 auto; }
+.item {
+  text-align: left; display: grid; grid-template-columns: 34px 1fr; gap: 4px 10px; align-items: start;
+  background: var(--raise); padding: 11px 12px; min-height: 0; font-family: var(--f-body); font-weight: 400; letter-spacing: 0;
+}
+.item.special { border-color: var(--crystal); }
+.item .sw { grid-row: span 3; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); }
+.item strong { font-family: var(--f-display); font-size: 15px; }
+.item .d { font-size: 12.5px; color: var(--dim); line-height: 1.35; }
+.item .meta { display: flex; justify-content: space-between; gap: 8px; font-family: var(--f-display); font-size: 13px; font-variant-numeric: tabular-nums; }
+.item .lock { color: var(--scrap); font-size: 12px; }
+.tag { font-family: var(--f-display); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--crystal); }
+.placebar {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 6;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); width: max-content; max-width: calc(100% - 32px);
+  display: flex; align-items: center; gap: 12px; background: var(--panel-solid); border: 1px solid var(--crystal); border-radius: 12px; padding: 8px 8px 8px 14px; font-size: 14px;
+}
+
+.overlay {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px; background: rgba(6, 9, 18, 0.72); overflow-y: auto;
+}
+.card { width: min(480px, 100%); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.card.wide { width: min(640px, 100%); }
+.eyebrow { font-family: var(--f-display); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--crystal); }
+h1, h2, h4 { font-family: var(--f-display); margin: 0; text-wrap: balance; line-height: 1.05; }
+h1 { font-size: 44px; letter-spacing: 0.02em; }
+h2 { font-size: 26px; }
+h4 { font-size: 15px; letter-spacing: 0.04em; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.card p { margin: 0; line-height: 1.5; }
+.muted { color: var(--dim); font-size: 13px; }
+.howto { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.howto li { display: grid; grid-template-columns: 104px 1fr; gap: 10px; font-size: 14px; line-height: 1.4; }
+.howto b { font-family: var(--f-display); color: var(--dim); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; font-size: 12px; padding-top: 2px; }
+.howto li.special b { color: var(--crystal); }
+.rows { display: grid; gap: 8px; }
+.row { display: flex; justify-content: space-between; gap: 12px; align-items: center; background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 14px; }
+.row > span:last-child { font-family: var(--f-display); font-variant-numeric: tabular-nums; text-align: right; }
+.report { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.report li { background: var(--raise); border: 1px solid var(--line); border-left: 3px solid var(--dim); border-radius: 8px; padding: 9px 12px; font-size: 14px; line-height: 1.4; }
+.report li.good { border-left-color: var(--core); }
+.report li.bad { border-left-color: var(--danger); }
+.report li.gold { border-left-color: var(--scrap); }
+.report li.new { border-left-color: var(--crystal); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions button { flex: 1 1 auto; }
+.cost { display: inline-flex; align-items: center; gap: 6px; }
+.cost + .cost { margin-left: 10px; }
+.train { display: grid; gap: 8px; }
+.train-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.planets { display: grid; gap: 8px; }
+.planet { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.planet.here { border-color: var(--core); }
+.planet.locked { opacity: 0.5; }
+.planet .ball { width: 30px; height: 30px; border-radius: 50%; box-shadow: inset -6px -6px 10px rgba(0,0,0,0.45); }
+.planet .info { min-width: 0; display: grid; gap: 2px; }
+.planet strong { font-family: var(--f-display); font-size: 16px; }
+.planet .st { font-family: var(--f-display); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+.planet .st.ok { color: var(--core); }
+.planet .d { font-size: 12.5px; color: var(--dim); line-height: 1.35; }
+.planet button { padding: 8px 12px; min-height: 40px; font-size: 13px; }
+.lab { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+.lab div { min-width: 0; }
+.lab strong { font-family: var(--f-display); font-size: 14.5px; display: block; }
+.lab span.d { font-size: 12.5px; color: var(--dim); }
+.lab button { padding: 8px 12px; min-height: 40px; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; }
+.pips { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
+.pips i { width: 8px; height: 8px; border-radius: 2px; background: rgba(255,255,255,0.15); }
+.pips i.on { background: var(--crystal); }
+
+#banner {
+  position: fixed; left: 0; right: 0; top: 30%; z-index: 6; text-align: center; pointer-events: none;
+  font-family: var(--f-display); font-weight: 700; font-size: clamp(28px, 7.5vw, 60px); letter-spacing: 0.14em;
+  text-shadow: 0 2px 24px rgba(0,0,0,0.7); opacity: 0; transition: opacity 0.4s; padding-inline: 16px;
+}
+#banner small { display: block; font-size: 0.32em; letter-spacing: 0.06em; font-weight: 500; color: var(--ink); margin-top: 8px; }
+#banner.show { opacity: 1; }
+#toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 122px); z-index: 7;
+  transform: translateX(-50%); background: var(--panel-solid); border: 1px solid var(--danger);
+  padding: 8px 14px; border-radius: 10px; font-size: 13.5px; pointer-events: none; opacity: 0; transition: opacity 0.2s; max-width: calc(100% - 32px); width: max-content; text-align: center;
+}
+#toast.show { opacity: 1; }
+#toast.good { border-color: var(--core); }
+#toast.gold { border-color: var(--scrap); }
+#toast.new { border-color: var(--crystal); }
+.stick { position: fixed; z-index: 4; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); pointer-events: none; }
+.stick i { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255,255,255,0.35); }
+@media (max-width: 560px) {
+  h1 { font-size: 36px; }
+  .stat small.lbl { display: none; }
+  .timer { min-width: 0; order: -1; width: 100%; }
+  .corechip { min-width: 120px; }
+  .howto li { grid-template-columns: 1fr; gap: 2px; }
+  button { padding: 10px 12px; font-size: 13px; }
+  .planet { grid-template-columns: 26px 1fr; }
+  .planet button { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { #banner, #toast, .bar i { transition: none; } .pop, .bump { animation-duration: 0.01s; } }
+</style>
+</head>
+<body>
+
+<canvas id="game" aria-label="Colonia Nova, vista de la colonia"></canvas>
+<div id="hurt"></div>
+<div id="pops" aria-hidden="true"></div>
+
+<div class="hud" id="hud" hidden>
+  <div class="group">
+    <div class="chip stat"><span class="gem scrap"></span><div><small class="lbl">Chatarra</small><span id="scrap">0</span></div></div>
+    <div class="chip stat"><span class="gem crystal"></span><div><small class="lbl">Cristales</small><span id="crys">0</span></div></div>
+    <div class="chip stat" id="troopChip" hidden><span class="dot"></span><div><small class="lbl">Tropas</small><span id="troopCount">0</span></div></div>
+  </div>
+  <div class="chip timer" id="timerChip"><small class="lbl" id="timerLbl">Próximo ataque en</small><strong id="timer">1:30</strong><span class="hazard" id="hazardTxt" hidden></span></div>
+  <div class="group">
+    <div class="chip corechip"><small class="lbl" id="coreLbl">Núcleo · nivel 1</small><span class="stat" id="coreTxt">120</span><div class="bar"><i id="coreBar"></i></div></div>
+    <button class="iconbtn" id="menuBtn" type="button" aria-label="Menú">⋯</button>
+  </div>
+</div>
+
+<div class="controls" id="controls" hidden>
+  <div class="btnrow">
+    <button id="buildBtn" type="button">Construir</button>
+    <button id="coreBtn" type="button">Núcleo</button>
+    <button id="shipBtn" type="button" class="ship">Nave</button>
+    <button id="squadBtn" type="button" class="squad" hidden>Escuadrón: te sigue</button>
+    <button id="nightBtn" type="button" class="warn">Adelantar ataque</button>
+  </div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<div class="placebar" id="placeBar" hidden><span id="placeTxt">Colocando</span><button id="placeDone" type="button">Listo</button></div>
+
+<div class="sheet" id="shop" hidden>
+  <div class="sheet-head"><h3>Construir</h3><button id="shopClose" type="button">Cerrar</button></div>
+  <div class="shop-grid" id="shopGrid"></div>
+</div>
+
+<div id="banner"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="stick" id="stick" hidden><i id="knob"></i></div>
+
+<div class="overlay" id="startScreen">
+  <div class="card">
+    <div class="eyebrow" id="ssEyebrow">Prototipo v4</div>
+    <h1 id="ssTitle">Colonia Nova</h1>
+    <p id="ssDesc">Construye tu colonia. Cada noche atacan los alienígenas.</p>
+    <ul class="howto">
+      <li class="special"><b>Este planeta</b><span id="ssTwist"></span></li>
+      <li><b>Moverte</b><span id="moveHelp">WASD o flechas. En móvil, arrastra el dedo.</span></li>
+      <li><b>Construir</b><span>Pulsa «Construir». Toca cualquier edificio para mejorarlo hasta nivel 3.</span></li>
+      <li><b>Explorar</b><span>Fuera del círculo hay cristales, nidos y restos de naves. Sigue las columnas de luz.</span></li>
+      <li><b>Nave</b><span>Supera las noches del planeta para viajar al siguiente. Los cristales y el laboratorio viajan contigo.</span></li>
+    </ul>
+    <button id="startBtn" class="primary" type="button">Fundar la colonia</button>
+  </div>
+</div>
+
+<div class="overlay" id="corePanel" hidden>
+  <div class="card">
+    <div class="eyebrow">El corazón de la colonia</div>
+    <h2 id="cpTitle">Núcleo · nivel 1</h2>
+    <div class="rows" id="cpRows"></div>
+    <p class="muted" id="cpNext"></p>
+    <div class="actions"><button id="cpUpgrade" class="primary" type="button">Mejorar</button><button id="cpClose" type="button">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="bPanel" hidden>
+  <div class="card">
+    <div class="eyebrow" id="bpEyebrow">Edificio</div>
+    <h2 id="bpTitle">Torreta · nivel 1</h2>
+    <p class="muted" id="bpDesc"></p>
+    <div class="rows" id="bpRows"></div>
+    <div class="train" id="bpTrain" hidden></div>
+    <p class="muted" id="bpNext"></p>
+    <div class="actions"><button id="bpUpgrade" class="primary" type="button">Mejorar</button><button id="bpClose" type="button">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="mapPanel" hidden>
+  <div class="card wide">
+    <div class="eyebrow" id="mpEyebrow">Nave colonial · Universo 1</div>
+    <h2>Sistema solar</h2>
+    <div class="planets" id="mpList"></div>
+    <div id="mpUniverse"></div>
+    <h4>Laboratorio <span class="cost"><span class="gem crystal"></span><span id="mpCrys">0</span></span></h4>
+    <p class="muted">Mejoras permanentes. Te acompañan a todos los planetas y universos.</p>
+    <div class="rows" id="labList"></div>
+    <button id="mpClose" class="primary" type="button">Cerrar</button>
+  </div>
+</div>
+
+<div class="overlay" id="reportPanel" hidden>
+  <div class="card">
+    <div class="eyebrow" id="rpEyebrow">Informe de la colonia</div>
+    <h2 id="rpTitle">Mientras no estabas</h2>
+    <ul class="report" id="rpList"></ul>
+    <div class="actions"><button id="rpAction" class="primary" type="button" hidden>Acción</button><button id="rpClose" type="button">Vale</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="menuPanel" hidden>
+  <div class="card">
+    <div class="eyebrow">Menú</div>
+    <h2>Colonia Nova</h2>
+    <button id="muteBtn" type="button">Sonido: activado</button>
+    <p class="muted">Para probar los ataques mientras no juegas sin esperar de verdad:</p>
+    <button id="simBtn" type="button">Simular que vuelves tras 2 horas</button>
+    <div id="resetBox" class="rows">
+      <button id="resetBtn" class="danger" type="button">Borrar toda la partida</button>
+    </div>
+    <div class="actions" id="resetConfirm" hidden>
+      <button id="resetYes" class="danger" type="button">Sí, borrar todo</button>
+      <button id="resetNo" type="button">No</button>
+    </div>
+    <button id="menuClose" class="primary" type="button">Cerrar</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const TAU = Math.PI * 2;
+  // ======================= planets =======================
+  const PLANETS = [
+    { id: 'marte', name: 'Marte', ball: '#c9553a', goal: 10, desc: 'El planeta rojo. Polvo, cráteres y los primeros alienígenas.',
+      twist: 'Tormentas de polvo: algunas noches el polvo reduce el alcance de tus defensas.', hazard: 'dust',
+      pal: { day: ['#e9b49b', '#ffe0cc', '#8a3f2c'], night: ['#12070b', '#5a2a3a', '#1a0b0c'], ground: 0xb4553a, pad: 0xc66b4c, rock: 0x7d3a28, flora: [0xff9f5a, 0xffd36e, 0xc77dff] },
+      sky: { moons: [[0xc9b8a8, 5, -60, 55, -130], [0x9a8a7a, 3, 45, 40, -140]] },
+      pool: [['bicho', 1, 1], ['veloz', 2, 0.3], ['escupidor', 2, 0.35], ['volador', 3, 0.3], ['acorazado', 4, 0.25]],
+      boss: { name: 'Gusano de polvo', col: 0xc2552e }, unique: [] },
+    { id: 'mercurio', name: 'Mercurio', ball: '#9a958e', goal: 8, desc: 'El más cercano al Sol. Días cortos y abrasadores, minerales por todas partes.',
+      twist: 'Calor extremo: fuera de la colonia pierdes vida de día. Las minas rinden el doble. Exclusivo: Espejo solar.', hazard: 'heat', dayLen: 60, mineMult: 2,
+      pal: { day: ['#f3e6c8', '#fff8e0', '#6b6662'], night: ['#0b0b0f', '#3a3a48', '#111111'], ground: 0x8f8a84, pad: 0xa29d96, rock: 0x6b6762, flora: [0xff6a1a, 0xffb84a, 0xffe14f] },
+      sky: { sun: [0xfff3c4, 28, -70, 45, -150] },
+      pool: [['bicho', 1, 1], ['kamikaze', 1, 0.4], ['salamandra', 2, 0.45], ['veloz', 3, 0.3], ['acorazado', 5, 0.2]],
+      boss: { name: 'Coloso de magma', col: 0xff4a1a }, unique: ['espejo'] },
+    { id: 'venus', name: 'Venus', ball: '#e0b45a', goal: 8, desc: 'Nubes amarillas y lluvia ácida. Todo se corroe.',
+      twist: 'Lluvia ácida: de día desgasta los edificios que no estén bajo un escudo. Exclusivo: Escudo.', hazard: 'acid',
+      pal: { day: ['#e8c46a', '#fff0b8', '#7a5a20'], night: ['#1c1206', '#6b4a1a', '#140c04'], ground: 0xb08a3e, pad: 0xc49b4a, rock: 0x6e5426, flora: [0x9dff4f, 0xd4ff6f, 0xffe14f] },
+      sky: { clouds: true },
+      pool: [['bicho', 1, 0.8], ['trepador', 1, 0.6], ['nube', 2, 0.35], ['escupidor', 3, 0.3], ['acorazado', 5, 0.2]],
+      boss: { name: 'Reina ácida', col: 0xb6ff3a }, unique: ['escudo'] },
+    { id: 'jupiter', name: 'Júpiter', ball: '#d6a676', goal: 8, desc: 'Gigante gaseoso. Tu colonia flota sobre una plataforma entre tormentas eléctricas.',
+      twist: 'Rayos: caen sobre la colonia a cualquier hora. Un pararrayos los atrapa y los convierte en chatarra. Colonia más pequeña.', hazard: 'lightning', colony: 22, world: 38,
+      pal: { day: ['#e9c39a', '#fff1dc', '#8a5a3a'], night: ['#140b08', '#5a3a2a', '#120a06'], ground: 0xc79a6e, pad: 0xd8ad80, rock: 0x8a5a3a, flora: [0xff7a3d, 0xffd36e, 0xf2f4f8] },
+      sky: { moons: [[0xf2d24a, 4, -70, 50, -130], [0xe8eef2, 3, -30, 62, -150], [0x9a8a7a, 6, 60, 48, -140]] },
+      pool: [['volador', 1, 0.7], ['medusa', 1, 0.5], ['bicho', 1, 0.6], ['acorazado', 3, 0.3], ['nube', 5, 0.2]],
+      boss: { name: 'Leviatán del rayo', col: 0x4fb8ff }, unique: ['pararrayos'] },
+    { id: 'saturno', name: 'Saturno', ball: '#e8d8a8', goal: 8, desc: 'Colonia sobre los anillos de hielo. Bajo tus pies, todo resbala.',
+      twist: 'Hielo: tu comandante y tus tropas patinan. Algunos alienígenas se parten en dos. Exclusivo: Cañón de hielo.', hazard: 'ice',
+      pal: { day: ['#f0e2c0', '#fff8ea', '#9aa6bd'], night: ['#0a0c14', '#3a4260', '#0e1018'], ground: 0xdfe8f0, pad: 0xeaf2f8, rock: 0xaebdcc, flora: [0x6fe3ff, 0xbfe9ff, 0xc77dff] },
+      sky: { ring: [0xe8d8a8, 0.35] },
+      pool: [['cristalino', 1, 0.8], ['bicho', 1, 0.6], ['veloz', 2, 0.3], ['escupidor', 3, 0.3], ['volador', 4, 0.25]],
+      boss: { name: 'Titán de hielo', col: 0xbfe9ff }, unique: ['congelador'] },
+    { id: 'urano', name: 'Urano', ball: '#9fe3e0', goal: 8, desc: 'Un mundo inclinado y helado. El frío congela las máquinas.',
+      twist: 'Frío extremo: las defensas lejos de un calefactor se congelan y disparan más despacio. Exclusivo: Calefactor.', hazard: 'cold',
+      pal: { day: ['#bfeff0', '#effffe', '#5a8a8c'], night: ['#061214', '#24525a', '#081416'], ground: 0x9fd8d6, pad: 0xb5e6e4, rock: 0x6aa3a2, flora: [0x6fe3ff, 0x9dff4f, 0xffffff] },
+      sky: { ring: [0x9fe3e0, 0.18], tilt: 1.3 },
+      pool: [['bicho', 1, 0.8], ['acorazado', 1, 0.35], ['cristalino', 2, 0.4], ['volador', 3, 0.3], ['trepador', 4, 0.3]],
+      boss: { name: 'Mamut glacial', col: 0x6fe3ff }, unique: ['calefactor'] },
+    { id: 'neptuno', name: 'Neptuno', ball: '#4f73d8', goal: 8, desc: 'Océanos de metano y los vientos más fuertes del sistema solar.',
+      twist: 'Huracanes: las rachas arrastran a todos. Los alienígenas llegan en manada desde un solo lado. Exclusivo: Turbina eólica.', hazard: 'wind',
+      pal: { day: ['#6f8ff0', '#cfe0ff', '#1f3a7a'], night: ['#040820', '#1a2a6a', '#050a1a'], ground: 0x3f5fa8, pad: 0x5070b8, rock: 0x2a427a, flora: [0x6fe3ff, 0x4fb8ff, 0xc77dff] },
+      sky: { moons: [[0xe0d8d0, 6, -50, 50, -140]] },
+      pool: [['tiburon', 1, 0.7], ['bicho', 1, 0.6], ['medusa', 2, 0.3], ['nube', 3, 0.25], ['veloz', 3, 0.3]],
+      boss: { name: 'Kraken', col: 0x2a4fd8 }, unique: ['turbina'] },
+    { id: 'pluton', name: 'Plutón', ball: '#c9bfb0', goal: 8, desc: 'Planeta enano en el borde del sistema. Casi no llega la luz del Sol.',
+      twist: 'Oscuridad: de noche tus defensas solo ven a los alienígenas iluminados por faros, por el núcleo o por tu linterna. Exclusivo: Faro.', hazard: 'dark', dayLen: 75,
+      pal: { day: ['#3a3644', '#8a8296', '#2a2630'], night: ['#020203', '#141220', '#050508'], ground: 0xc9bfb0, pad: 0xd8cfc2, rock: 0x8a8276, flora: [0xc77dff, 0x6fe3ff, 0xff4fd8], dim: 0.55 },
+      sky: { moons: [[0xb8b0a8, 14, -40, 45, -140]], sun: [0xfff6d8, 2, 60, 50, -160] },
+      pool: [['sombra', 1, 0.7], ['bicho', 1, 0.6], ['escupidor', 2, 0.3], ['acorazado', 3, 0.3], ['trepador', 4, 0.25]],
+      boss: { name: 'Corazón de Plutón', col: 0x8a5cff }, unique: ['faro'] }
+  ];
+
+  // ======================= tuning =======================
+  const OFFLINE_EVERY = 20 * 60, GRID = 2, PLAYER_RANGE = 8, SPAWN_WINDOW = 34;
+  const LV_HP = [1, 1.5, 2.2], LV_WALL = [1, 1.8, 2.8], LV_DMG = [1, 1.45, 2.1], LV_RANGE = [0, 0.8, 1.6], LV_PROD = [1, 1.6, 2.3], LV_SCALE = [1, 1.08, 1.16], LV_COST = [0, 1.6, 3.2], LV_AURA = [1, 1.15, 1.3];
+  const CAP = [3, 5, 7], WORKERS = [2, 3, 4];
+  const DEF = {
+    muro:    { name: 'Muro', desc: 'Barato y resistente. Los alienígenas tienen que romperlo para pasar.', cost: 15, hp: 70, r: 0.9, lock: 1, sw: '#8c97ad', wall: true },
+    torreta: { name: 'Torreta', desc: 'Dispara a un enemigo. Alcance medio.', cost: 45, hp: 45, r: 1, lock: 1, range: 8.5, rate: 0.6, dmg: 1.2, def: 1, sw: '#d6dcea' },
+    mina:    { name: 'Mina de chatarra', desc: 'Produce chatarra. Recógela tú o deja que lo hagan los colonos.', cost: 60, hp: 40, r: 1, lock: 1, rate: 0.45, cap: 50, sw: '#f2b84b' },
+    habitat: { name: 'Hábitat', desc: 'Sus colonos llevan la chatarra de las minas al núcleo.', cost: 90, hp: 60, r: 1.3, lock: 2, sw: '#f2f4f8' },
+    cuartel: { name: 'Cuartel', desc: 'Entrena soldados e ingenieros que luchan a tu lado.', cost: 120, hp: 80, r: 1.4, lock: 2, sw: '#e0483e' },
+    laser:   { name: 'Torre láser', desc: 'Disparo muy rápido. Alcance corto. Alcanza a los voladores.', cost: 110, hp: 50, r: 1, lock: 2, range: 6, rate: 0.12, dmg: 0.45, def: 1.5, sw: '#6fe3ff', beam: 0x9ff4ff },
+    mortero: { name: 'Mortero', desc: 'Daño en área a gran distancia. No alcanza a los voladores.', cost: 150, hp: 55, r: 1.1, lock: 3, range: 12, min: 3, rate: 2.4, dmg: 4, area: 2.4, def: 2, sw: '#ff9f5a' },
+    espejo:     { name: 'Espejo solar', desc: 'Concentra el sol en un rayo enorme. Mucho alcance, dispara despacio.', cost: 80, hp: 45, r: 1, lock: 1, range: 14, rate: 2, dmg: 6, def: 2, sw: '#fff1a8', beam: 0xfff1a8, special: true },
+    escudo:     { name: 'Escudo', desc: 'Cúpula que frena el ácido y reduce a la mitad el daño a lo que hay dentro.', cost: 90, hp: 60, r: 1, lock: 1, aura: 6, sw: '#9fe8ff', special: true },
+    pararrayos: { name: 'Pararrayos', desc: 'Atrae los rayos cercanos y los convierte en chatarra.', cost: 50, hp: 50, r: 0.8, lock: 1, aura: 7, sw: '#ffe14f', special: true },
+    congelador: { name: 'Cañón de hielo', desc: 'Dispara hielo que ralentiza a los alienígenas a la mitad.', cost: 70, hp: 45, r: 1, lock: 1, range: 8, rate: 0.9, dmg: 0.5, slow: true, def: 1.2, sw: '#bfe9ff', special: true },
+    calefactor: { name: 'Calefactor', desc: 'Las defensas cercanas no se congelan.', cost: 60, hp: 50, r: 1, lock: 1, aura: 8, sw: '#ff9f5a', special: true },
+    turbina:    { name: 'Turbina eólica', desc: 'Produce chatarra mientras sopla el huracán.', cost: 70, hp: 45, r: 1, lock: 1, rate: 1.4, sw: '#d6dcea', special: true },
+    faro:       { name: 'Faro', desc: 'Ilumina la zona para que tus defensas vean a los alienígenas.', cost: 40, hp: 40, r: 0.8, lock: 1, aura: 10, sw: '#fff7c2', special: true }
+  };
+  const BASE_ORDER = ['muro', 'torreta', 'mina', 'habitat', 'cuartel', 'laser', 'mortero'];
+  const LIMITS = { muro: [10, 16, 24, 32, 40], torreta: [2, 3, 4, 5, 6], mina: [1, 2, 3, 3, 4], habitat: [0, 1, 2, 2, 3], cuartel: [0, 1, 1, 1, 1], laser: [0, 1, 2, 2, 3], mortero: [0, 0, 1, 2, 2],
+    espejo: [1, 2, 2, 3, 3], escudo: [1, 1, 2, 2, 3], pararrayos: [1, 2, 3, 3, 4], congelador: [1, 2, 2, 3, 3], calefactor: [2, 3, 4, 5, 6], turbina: [1, 2, 3, 3, 4], faro: [2, 3, 4, 5, 6] };
+  const CORE = [{ hp: 120, s: 150, c: 0 }, { hp: 180, s: 350, c: 3 }, { hp: 260, s: 700, c: 6 }, { hp: 350, s: 1100, c: 10 }, { hp: 450 }];
+  const TROOP = {
+    soldado:   { name: 'Soldado', desc: 'Dispara a los alienígenas cercanos.', cost: 30, hp: 50, dmg: 0.8, rate: 0.5, range: 6, accent: 0xe0483e },
+    ingeniero: { name: 'Ingeniero', desc: 'Repara edificios y el núcleo mientras luchas.', cost: 40, hp: 35, dmg: 0.4, rate: 0.9, range: 5, repair: 9, accent: 0xf2b84b }
+  };
+  const ALIEN = {
+    bicho:      { name: 'Bicho', desc: 'Va a por tus edificios.', r: 0.5, hp: 3, spd: 2.3, dmg: 5, rate: 0.8, col: 0xff4fd8, drop: 2 },
+    veloz:      { name: 'Veloz', desc: 'Muy rápido. Ataca minas, hábitats y el cuartel.', r: 0.38, hp: 2, spd: 4.2, dmg: 3, rate: 0.6, col: 0x9dff4f, drop: 2 },
+    escupidor:  { name: 'Escupidor', desc: 'Escupe ácido desde lejos.', r: 0.5, hp: 3, spd: 2, dmg: 7, rate: 1.6, range: 6.5, col: 0x8a5cff, drop: 3 },
+    volador:    { name: 'Volador', desc: 'Vuela por encima de los muros. Los morteros no lo alcanzan.', r: 0.45, hp: 2.5, spd: 3, dmg: 4, rate: 0.8, col: 0xffe14f, drop: 3, fly: true },
+    acorazado:  { name: 'Acorazado', desc: 'Lento y muy resistente. Va a por tus defensas.', r: 0.8, hp: 14, spd: 1.1, dmg: 12, rate: 1.1, col: 0xff5a3d, drop: 6 },
+    salamandra: { name: 'Salamandra', desc: 'Deja un rastro de fuego que quema lo que pisa.', r: 0.5, hp: 4, spd: 2.2, dmg: 6, rate: 0.9, col: 0xff6a1a, drop: 3, burn: true },
+    kamikaze:   { name: 'Escarabajo solar', desc: 'Explota al tocar algo.', r: 0.45, hp: 2, spd: 3.6, dmg: 22, rate: 0.5, col: 0xffd23a, drop: 3, explode: true },
+    trepador:   { name: 'Trepador', desc: 'Trepa por encima de los muros.', r: 0.5, hp: 4, spd: 2, dmg: 6, rate: 0.8, col: 0x7dff4f, drop: 3, climb: true },
+    nube:       { name: 'Nube ácida', desc: 'Flota y corroe todo lo que tiene debajo.', r: 0.7, hp: 5, spd: 1.6, dmg: 5, rate: 1.2, col: 0xd4ff6f, drop: 4, fly: true, area: 2.6 },
+    medusa:     { name: 'Medusa eléctrica', desc: 'Vuela y va a por ti y tus tropas.', r: 0.6, hp: 5, spd: 2.4, dmg: 7, rate: 0.9, col: 0x4fb8ff, drop: 4, fly: true, hunter: true },
+    cristalino: { name: 'Cristalino', desc: 'Al morir se rompe en dos más pequeños.', r: 0.65, hp: 6, spd: 1.9, dmg: 7, rate: 1, col: 0x9fe8ff, drop: 4, split: true },
+    cristalito: { name: 'Cristalito', desc: 'Trozo rápido de un cristalino.', r: 0.35, hp: 1.5, spd: 3.2, dmg: 3, rate: 0.6, col: 0xbfe9ff, drop: 1 },
+    tiburon:    { name: 'Tiburón de tormenta', desc: 'Llega en manada a toda velocidad.', r: 0.55, hp: 2.6, spd: 4.2, dmg: 5, rate: 0.7, col: 0x4f7bff, drop: 2, pack: 3 },
+    sombra:     { name: 'Sombra', desc: 'Rápida y casi invisible en la oscuridad.', r: 0.5, hp: 5, spd: 2.8, dmg: 8, rate: 0.8, col: 0x8a5cff, drop: 4 },
+    jefe:       { name: 'Jefe', desc: 'Enorme. Aparece cada 5 noches.', r: 1.3, hp: 45, spd: 1.2, dmg: 25, rate: 1.2, col: 0xff7a3d, drop: 40, cry: 4 }
+  };
+  const LAB = {
+    vida:   { name: 'Traje reforzado', desc: '+20 de vida para tu comandante' },
+    dano:   { name: 'Arma de plasma', desc: '+20% de daño de tu comandante' },
+    botin:  { name: 'Recolector', desc: '+10% de chatarra ganada' },
+    obras:  { name: 'Ingeniería', desc: '−6% en el coste de construir y mejorar' },
+    tropas: { name: 'Entrenamiento', desc: '+20% de vida de tus tropas' }
+  };
+  const LAB_MAX = 5, labCost = (lv) => 4 + lv * 4;
+
+  const $ = (s) => document.querySelector(s);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+
+  // ======================= save =======================
+  const SAVE_KEY = 'colonia-nova-v4';
+  function readJSON(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  let W = readJSON(SAVE_KEY), migrated = false;
+  if (!W || !W.colonies) {
+    let old = readJSON('colonia-nova-v3');
+    if (!old || !Array.isArray(old.buildings)) {
+      const o2 = readJSON('colonia-nova-v2');
+      old = o2 && Array.isArray(o2.buildings) ? Object.assign({}, o2, { buildings: o2.buildings.map((b) => Object.assign({}, b, { lv: 1 })) }) : null;
+    }
+    W = { v: 4, crys: old ? old.crys || 0 : 0, lab: {}, universe: 1, cur: 'marte', done: {}, unlocked: ['marte'], seen: (old && old.seen) || {}, colonies: {}, muted: false, news: old ? 0 : 4 };
+    if (old) {
+      const c = Object.assign({}, old); delete c.crys; delete c.seen; delete c.news; delete c.planetShown;
+      c.buildings = (c.buildings || []).filter((b) => DEF[b.t]);
+      W.colonies.marte = c; migrated = true;
+    }
+  }
+  ['lab', 'done', 'seen', 'colonies'].forEach((k) => { if (!W[k]) W[k] = {}; });
+  if (!Array.isArray(W.unlocked)) W.unlocked = ['marte'];
+  const P = PLANETS.find((p) => p.id === W.cur) || PLANETS[0];
+  const PIDX = PLANETS.indexOf(P), U = W.universe || 1;
+  const COLONY = P.colony || 26, WORLD = P.world || 44, RIFT_R = WORLD - 6, DAY_LEN = P.dayLen || 90;
+  const labLv = (k) => W.lab[k] || 0;
+  const costMul = () => 1 - 0.06 * labLv('obras');
+  const costOf = (t) => Math.round(DEF[t].cost * costMul());
+  const CMD_HP = 100 + 20 * labLv('vida');
+  const HP_MUL = (1 + 0.08 * PIDX) * (1 + 0.6 * (U - 1));
+  let G = W.colonies[P.id];
+  const isNew = !G;
+  if (!G) G = W.colonies[P.id] = { scrap: 200, coreLv: 1, nights: 0, buildings: [], lastSeen: Date.now(), troops: { soldado: 0, ingeniero: 0 } };
+  Object.defineProperty(G, 'crys', { get: () => W.crys, set: (v) => { W.crys = v; }, enumerable: false, configurable: true });
+  if (!G.troops) G.troops = { soldado: 0, ingeniero: 0 };
+  ALIEN.jefe = Object.assign({}, ALIEN.jefe, { name: P.boss.name, col: P.boss.col, hp: 45 });
+  const ORDER = BASE_ORDER.concat(P.unique);
+
+  // ======================= sound =======================
+  let AC = null;
+  const lastS = {};
+  const SFX = { coin: [880, 1320, 'sine', 0.12, 0.07], build: [180, 90, 'square', 0.18, 0.05], shoot: [620, 300, 'square', 0.05, 0.018], kill: [300, 120, 'triangle', 0.16, 0.06],
+    hurt: [200, 80, 'sawtooth', 0.18, 0.05], night: [110, 70, 'sawtooth', 1.2, 0.07], up: [520, 1040, 'triangle', 0.35, 0.08], crystal: [1320, 1980, 'sine', 0.2, 0.07], boom: [90, 40, 'sawtooth', 0.5, 0.09], zap: [1200, 200, 'sawtooth', 0.15, 0.05] };
+  function sfx(n) {
+    if (W.muted || !AC) return;
+    try {
+      const now = AC.currentTime, p = SFX[n]; if (!p) return;
+      if (lastS[n] && now - lastS[n] < (n === 'shoot' ? 0.08 : 0.05)) return; lastS[n] = now;
+      const o = AC.createOscillator(), g = AC.createGain(); o.connect(g); g.connect(AC.destination);
+      o.type = p[2]; o.frequency.setValueAtTime(p[0], now); o.frequency.exponentialRampToValueAtTime(p[1], now + p[3]);
+      g.gain.setValueAtTime(p[4], now); g.gain.exponentialRampToValueAtTime(0.0001, now + p[3]);
+      o.start(now); o.stop(now + p[3] + 0.02);
+    } catch (e) {}
+  }
+
+  // ======================= renderer =======================
+  const canvas = $('#game');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color();
+  scene.fog = new THREE.Fog(0x000000, 60, 140);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+  let camScale = 1;
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    camScale = w < h ? 1.6 : 1;
+  }
+  window.addEventListener('resize', resize); resize();
+
+  const MC = {};
+  function M(c, e, ei) {
+    const k = c + '|' + (e || 0) + '|' + (ei || 0);
+    return MC[k] || (MC[k] = new THREE.MeshStandardMaterial({ color: c, emissive: e || 0, emissiveIntensity: ei || 0, flatShading: true, roughness: 0.85 }));
+  }
+  const glowMats = [], GC = {};
+  function glow(c, base) {
+    const k = c + '|' + base; if (GC[k]) return GC[k];
+    const m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: base, flatShading: true });
+    glowMats.push({ m, base }); return (GC[k] = m);
+  }
+  const Box = (a, b, c) => new THREE.BoxGeometry(a, b, c);
+  const Cyl = (a, b, h, s) => new THREE.CylinderGeometry(a, b, h, s);
+  function mesh(geo, mat, x, y, z) { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.castShadow = true; m.receiveShadow = true; return m; }
+  function flat(geo, mat, x, y, z) { const m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; m.position.set(x || 0, y || 0.06, z || 0); return m; }
+  const basic = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: opacity != null, opacity: opacity == null ? 1 : opacity, depthWrite: opacity == null });
+  function beam(color, h, rad) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rad || 0.35, rad || 0.35, h, 12, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.y = h / 2; return m;
+  }
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+  // ======================= lights / sky =======================
+  const pal = (a) => ({ bg: new THREE.Color(a[0]), sky: new THREE.Color(a[1]), gnd: new THREE.Color(a[2]) });
+  const DIM = P.pal.dim || 1;
+  const PAL = {
+    day: Object.assign(pal(P.pal.day), { hemi: 0.85 * DIM, sun: new THREE.Color('#fff0d2'), sunI: 1.15 * DIM, near: P.hazard === 'dark' ? 40 : 70, far: P.hazard === 'dark' ? 110 : 160 }),
+    night: Object.assign(pal(P.pal.night), { hemi: P.hazard === 'dark' ? 0.2 : 0.36, sun: new THREE.Color('#6d84cc'), sunI: P.hazard === 'dark' ? 0.08 : 0.24, near: 30, far: 78 })
+  };
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xffffff, 1);
+  sun.position.set(-20, 34, 14); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera; sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 100; sc.updateProjectionMatrix();
+  scene.add(sun, sun.target);
+  const starGeo = new THREE.BufferGeometry(), sp = [];
+  for (let i = 0; i < 700; i++) { const a = Math.random() * TAU, e = Math.random() * 0.9 + 0.08, R = 170; sp.push(Math.cos(a) * Math.cos(e) * R, Math.sin(e) * R, Math.sin(a) * Math.cos(e) * R); }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+  scene.add(new THREE.Points(starGeo, starMat));
+  const skyMats = [];
+  function skyBody(geo, col, x, y, z, dayVis) { const m = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, fog: false, depthWrite: false }); const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); scene.add(o); skyMats.push({ m, dayVis }); return o; }
+  (P.sky.moons || []).forEach(([c, r, x, y, z]) => skyBody(new THREE.SphereGeometry(r, 18, 12), c, x, y, z, 0.35));
+  if (P.sky.sun) { const [c, r, x, y, z] = P.sky.sun; skyBody(new THREE.SphereGeometry(r, 24, 16), c, x, y, z, 1); }
+  if (P.sky.ring) { const o = skyBody(new THREE.TorusGeometry(150, 7, 4, 90), P.sky.ring[0], 0, -20, -40, P.sky.ring[1] * 1.6); o.rotation.x = P.sky.tilt || 1.25; o.rotation.y = 0.3; o.scale.set(1, 1, 0.12); }
+
+  let mix = 0, mixTarget = 0, coreLight = null, CMD = null, flashT = 0, fogMul = 1;
+  const tmpC = new THREE.Color();
+  function applyPalette() {
+    const d = PAL.day, n = PAL.night;
+    scene.background.copy(d.bg).lerp(n.bg, mix);
+    scene.fog.color.copy(scene.background);
+    scene.fog.near = (d.near + (n.near - d.near) * mix) * fogMul; scene.fog.far = (d.far + (n.far - d.far) * mix) * fogMul;
+    hemi.color.copy(d.sky).lerp(n.sky, mix);
+    hemi.groundColor.copy(tmpC.copy(d.gnd).lerp(n.gnd, mix));
+    hemi.intensity = d.hemi + (n.hemi - d.hemi) * mix + flashT * 6;
+    sun.color.copy(d.sun).lerp(n.sun, mix); sun.intensity = d.sunI + (n.sunI - d.sunI) * mix;
+    starMat.opacity = mix * (P.sky.clouds ? 0.08 : 1);
+    skyMats.forEach((s) => { s.m.opacity = s.dayVis + (1 - s.dayVis) * mix; });
+    glowMats.forEach((g) => { g.m.emissiveIntensity = g.base * (0.35 + mix * 1.1); });
+    if (coreLight) coreLight.intensity = 0.4 + mix * 2;
+    if (CMD) CMD.lamp.intensity = CMD.dead ? 0 : Math.max(mix, P.hazard === 'dark' ? 0.8 : 0) * 2.2;
+  }
+
+  // ======================= ground & scenery =======================
+  const gGeo = new THREE.PlaneGeometry(150, 150, 75, 75); gGeo.rotateX(-Math.PI / 2);
+  const gp = gGeo.attributes.position;
+  for (let i = 0; i < gp.count; i++) {
+    const x = gp.getX(i), z = gp.getZ(i), r = Math.hypot(x, z);
+    let h = (Math.random() - 0.5) * 0.16;
+    if (r > WORLD + 1) h += (r - WORLD - 1) * (P.id === 'jupiter' ? -0.6 : (0.3 + Math.random() * 0.35));
+    gp.setY(i, h);
+  }
+  gGeo.computeVertexNormals();
+  const ground = new THREE.Mesh(gGeo, new THREE.MeshStandardMaterial({ color: P.pal.ground, flatShading: true, roughness: P.hazard === 'ice' ? 0.35 : 1 }));
+  ground.receiveShadow = true; scene.add(ground);
+  const padM = new THREE.Mesh(new THREE.CircleGeometry(COLONY, 64), new THREE.MeshStandardMaterial({ color: P.pal.pad, flatShading: true, roughness: 1, transparent: true, opacity: 0.55 }));
+  padM.rotation.x = -Math.PI / 2; padM.position.y = 0.04; padM.receiveShadow = true; scene.add(padM);
+  scene.add(flat(new THREE.RingGeometry(COLONY - 0.15, COLONY, 128), basic(0x6fe3ff, 0.3), 0, 0.08, 0));
+  for (let i = 0; i < 24; i++) { const a = i / 24 * TAU; scene.add(mesh(Cyl(0.08, 0.1, 0.9, 5), M(0x8c97ad), Math.cos(a) * COLONY, 0.45, Math.sin(a) * COLONY)); scene.add(mesh(new THREE.SphereGeometry(0.1, 6, 4), glow(0x6fe3ff, 0.8), Math.cos(a) * COLONY, 0.95, Math.sin(a) * COLONY)); }
+  if (P.id === 'jupiter') { const rim = mesh(new THREE.TorusGeometry(WORLD + 0.6, 0.5, 6, 90), M(0x8c97ad), 0, -0.2, 0); rim.rotation.x = Math.PI / 2; scene.add(rim); }
+  const rockMat = M(P.pal.rock);
+  for (let i = 0; i < 70; i++) {
+    const a = Math.random() * TAU, r = WORLD + 3 + Math.random() * 20, s = 0.8 + Math.random() * 3;
+    if (P.id === 'jupiter') { const cl = mesh(new THREE.SphereGeometry(s * 1.6, 8, 6), M(0xf2e6d8), Math.cos(a) * r, -6 - Math.random() * 6, Math.sin(a) * r); scene.add(cl); continue; }
+    const m = mesh(P.hazard === 'ice' ? new THREE.OctahedronGeometry(s, 0) : new THREE.DodecahedronGeometry(s, 0), rockMat, Math.cos(a) * r, s * 0.4 + (r - WORLD) * 0.3, Math.sin(a) * r);
+    m.rotation.set(Math.random() * 3, Math.random() * 3, 0); scene.add(m);
+  }
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * TAU, r = 6 + Math.random() * (WORLD - 9), s = 1 + Math.random() * 1.6;
+    scene.add(flat(new THREE.RingGeometry(s * 0.6, s, 10), M(P.pal.rock), Math.cos(a) * r, 0.06, Math.sin(a) * r));
+  }
+  const floraCaps = P.pal.flora.map((c, i) => glow(c, 0.5 + i * 0.05)), stemMat = M(0x5b4a6b);
+  for (let i = 0; i < 70; i++) {
+    const a = Math.random() * TAU, r = COLONY + 2 + Math.random() * (WORLD - COLONY - 1), h = 0.6 + Math.random() * 1.6;
+    const g = new THREE.Group();
+    if (P.hazard === 'ice' || P.hazard === 'cold') { g.add(mesh(new THREE.ConeGeometry(0.25, h * 1.4, 5), floraCaps[i % 3], 0, h * 0.7, 0)); }
+    else { g.add(mesh(Cyl(0.08, 0.12, h, 5), stemMat, 0, h / 2, 0)); g.add(mesh(new THREE.SphereGeometry(0.3 + Math.random() * 0.35, 7, 5, 0, TAU, 0, Math.PI / 2), floraCaps[i % 3], 0, h, 0)); }
+    g.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); g.rotation.z = (Math.random() - 0.5) * 0.4; scene.add(g);
+  }
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * TAU, r = COLONY + 3 + Math.random() * (WORLD - COLONY - 4), s = 0.6 + Math.random() * 1.2;
+    const m = mesh(new THREE.DodecahedronGeometry(s, 0), rockMat, Math.cos(a) * r, s * 0.35, Math.sin(a) * r); m.rotation.set(Math.random() * 3, Math.random() * 3, 0); scene.add(m);
+  }
+  // weather particles (rain, wind streaks, dust)
+  const WX_N = 600, wxArr = new Float32Array(WX_N * 3);
+  for (let i = 0; i < WX_N; i++) { wxArr[i * 3] = (Math.random() - 0.5) * 70; wxArr[i * 3 + 1] = Math.random() * 25; wxArr[i * 3 + 2] = (Math.random() - 0.5) * 70; }
+  const wxGeo = new THREE.BufferGeometry(); wxGeo.setAttribute('position', new THREE.Float32BufferAttribute(wxArr, 3));
+  const wxMat = new THREE.PointsMaterial({ color: 0xd4ff6f, size: 0.25, transparent: true, opacity: 0.8, depthWrite: false });
+  const wx = new THREE.Points(wxGeo, wxMat); wx.visible = false; wx.frustumCulled = false; scene.add(wx);
+  const boltGeo = new THREE.BufferGeometry(); boltGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(8 * 3), 3));
+  const bolt = new THREE.Line(boltGeo, new THREE.LineBasicMaterial({ color: 0xffffff })); bolt.visible = false; bolt.frustumCulled = false; scene.add(bolt);
+
+  // ======================= health bars =======================
+  const barGeo = new THREE.PlaneGeometry(1, 1), barFgGeo = new THREE.PlaneGeometry(1, 1); barFgGeo.translate(0.5, 0, 0);
+  const barBgMat = new THREE.MeshBasicMaterial({ color: 0x0b0f1c, transparent: true, opacity: 0.8, depthTest: false });
+  const BARM = {};
+  [['good', 0x7dffb0], ['warn', 0xf2b84b], ['bad', 0xff6b5e], ['enemy', 0xff4fd8], ['info', 0x6fe3ff]].forEach(([k, c]) => { BARM[k] = new THREE.MeshBasicMaterial({ color: c, depthTest: false }); });
+  function makeBar(w) {
+    const g = new THREE.Group();
+    const bg = new THREE.Mesh(barGeo, barBgMat); bg.scale.set(w + 0.1, 0.26, 1); bg.renderOrder = 10;
+    const fg = new THREE.Mesh(barFgGeo, BARM.good); fg.scale.set(w, 0.16, 1); fg.position.set(-w / 2, 0, 0.001); fg.renderOrder = 11;
+    g.add(bg, fg); g.visible = false; scene.add(g); return { g, fg, w };
+  }
+  function setBar(bar, pct, x, y, z, mat) {
+    bar.g.visible = true; bar.g.position.set(x, y, z); bar.g.quaternion.copy(camera.quaternion);
+    bar.fg.scale.x = Math.max(0.001, bar.w * clamp(pct, 0, 1));
+    bar.fg.material = mat || (pct > 0.5 ? BARM.good : pct > 0.25 ? BARM.warn : BARM.bad);
+  }
+  const killBar = (bar) => { if (bar) scene.remove(bar.g); };
+
+  // ======================= floating numbers =======================
+  const popsBox = $('#pops'), projV = V(0, 0, 0);
+  function popup(text, cls, x, y, z) {
+    if (!projV.project) return;
+    projV.set(x, y, z).project(camera);
+    if (projV.z > 1) return;
+    const e = el('span', 'pop ' + cls, text);
+    e.style.left = ((projV.x + 1) / 2 * window.innerWidth).toFixed(0) + 'px';
+    e.style.top = ((1 - projV.y) / 2 * window.innerHeight).toFixed(0) + 'px';
+    popsBox.append(e); setTimeout(() => e.remove(), 1000);
+  }
+  function bumpEl(id) { const e = $(id); e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump'); }
+  function gain(n, x, y, z, big) {
+    n = Math.max(1, Math.round(n * (1 + 0.1 * labLv('botin'))));
+    G.scrap += n;
+    if (x != null) popup('+' + n, 'gold' + (big ? ' big' : ''), x, y, z);
+    bumpEl('#scrap'); sfx('coin');
+    return n;
+  }
+  function gainC(n, x, y, z) {
+    G.crys += n;
+    if (x != null) popup('+' + n + ' ◆', 'crys', x, y, z);
+    bumpEl('#crys'); sfx('crystal');
+  }
+
+  // ======================= core =======================
+  const coreG = new THREE.Group(); coreG.userData.core = true; scene.add(coreG);
+  let coreGem = null, coreRings = [], coreBeacon = null, coreHitT = 0;
+  const CORE_T = { isCore: true, x: 0, z: 0, r: 3.2, dead: false };
+  const beaconMat = glow(0xff4f6a, 1.2);
+  function buildCore(lv) {
+    while (coreG.children.length) coreG.remove(coreG.children[0]);
+    coreRings = [];
+    coreG.add(mesh(Cyl(3.3, 3.6, 0.5, 8), M(0x4a5468), 0, 0.25, 0));
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + TAU / 16; coreG.add(mesh(Box(0.35, 0.12, 0.35), glow(0x7dffb0, 0.9), Math.cos(a) * 3.15, 0.55, Math.sin(a) * 3.15)); }
+    for (let i = 0; i < 4; i++) { const a = i / 4 * TAU; const s = mesh(Box(1.2, 0.25, 0.7), M(0x5d6880), Math.cos(a) * 3.75, 0.13, Math.sin(a) * 3.75); s.rotation.y = -a; coreG.add(s); }
+    coreG.add(mesh(Cyl(2.2, 2.6, 1.7, 8), M(0x9aa6bd), 0, 1.35, 0));
+    coreG.add(mesh(Cyl(2.24, 2.24, 0.28, 8), glow(0x7dffb0, 0.7), 0, 1.6, 0));
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; const w = mesh(Box(0.5, 0.3, 0.1), glow(0x9fe8ff, 0.5), Math.cos(a) * 2.32, 1.05, Math.sin(a) * 2.32); w.rotation.y = -a + Math.PI / 2; coreG.add(w); }
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0xbfe9ff, emissive: 0x2a6a90, emissiveIntensity: 0.35, transparent: true, opacity: 0.6, flatShading: true });
+    coreG.add(mesh(new THREE.SphereGeometry(1.9, 14, 8, 0, TAU, 0, Math.PI / 2), domeMat, 0, 2.2, 0));
+    const spireH = 2.4 + lv * 0.5;
+    coreG.add(mesh(Cyl(0.16, 0.32, spireH, 6), M(0xd6dcea), 0, 2.2 + spireH / 2, 0));
+    coreGem = mesh(new THREE.OctahedronGeometry(0.75 + lv * 0.1), M(0x7dffb0, 0x2bd47a, 0.9), 0, 2.2 + spireH + 0.9, 0);
+    coreGem.userData.baseY = coreGem.position.y; coreG.add(coreGem);
+    for (let i = 0; i < lv; i++) {
+      const ring = mesh(new THREE.TorusGeometry(1.15 + i * 0.32, 0.05, 6, 40), glow(0x7dffb0, 0.8), 0, coreGem.position.y, 0);
+      ring.rotation.x = Math.PI / 2 + i * 0.5; coreRings.push(ring); coreG.add(ring);
+    }
+    coreG.add(mesh(Cyl(0.05, 0.05, 2.6, 4), M(0xd6dcea), 2.0, 2.8, -0.9));
+    coreBeacon = mesh(new THREE.SphereGeometry(0.16, 8, 6), beaconMat, 2.0, 4.15, -0.9); coreG.add(coreBeacon);
+    for (let i = 0; i < lv; i++) { const a = -Math.PI / 2 + (i - (lv - 1) / 2) * 0.35; coreG.add(mesh(Box(0.12, 0.5, 0.12), M(0xf2b84b), Math.cos(a) * 2.9, 0.75, Math.sin(a) * 2.9)); }
+    coreLight = new THREE.PointLight(0x7dffb0, 0.4, 22); coreLight.position.y = coreGem.position.y; coreG.add(coreLight);
+  }
+
+  // ======================= astronauts =======================
+  function astronaut(accent, s, extra) {
+    const g = new THREE.Group();
+    const suit = M(0xf2f4f8), acc = M(accent), dark = M(0x2c3446), gray = M(0xb9c2d4);
+    const hipL = new THREE.Group(), hipR = new THREE.Group(); hipL.position.set(-0.14, 0.52, 0); hipR.position.set(0.14, 0.52, 0);
+    hipL.add(mesh(Box(0.22, 0.5, 0.26), suit, 0, -0.25, 0)); hipR.add(mesh(Box(0.22, 0.5, 0.26), suit, 0, -0.25, 0));
+    hipL.add(mesh(Box(0.24, 0.12, 0.3), dark, 0, -0.47, 0.02)); hipR.add(mesh(Box(0.24, 0.12, 0.3), dark, 0, -0.47, 0.02));
+    g.add(hipL, hipR);
+    g.add(mesh(Box(0.62, 0.62, 0.4), suit, 0, 0.84, 0));
+    g.add(mesh(Box(0.64, 0.1, 0.42), acc, 0, 0.92, 0));
+    g.add(mesh(Box(0.64, 0.08, 0.42), dark, 0, 0.56, 0));
+    g.add(mesh(Box(0.22, 0.16, 0.06), glow(0x6fe3ff, 0.6), 0, 0.78, 0.21));
+    const shL = new THREE.Group(), shR = new THREE.Group(); shL.position.set(-0.4, 1.06, 0); shR.position.set(0.4, 1.06, 0);
+    shL.add(mesh(Box(0.17, 0.5, 0.2), suit, 0, -0.24, 0)); shR.add(mesh(Box(0.17, 0.5, 0.2), suit, 0, -0.24, 0));
+    if (extra !== 'worker') shR.add(mesh(Box(0.12, 0.14, 0.5), dark, 0, -0.42, 0.2));
+    if (extra === 'tool') shL.add(mesh(Box(0.1, 0.1, 0.45), M(0xf2b84b), 0, -0.45, 0.18));
+    g.add(shL, shR);
+    g.add(mesh(new THREE.SphereGeometry(0.34, 12, 10), suit, 0, 1.42, 0));
+    g.add(mesh(new THREE.SphereGeometry(0.355, 12, 8, 0.67, 1.8, 0.95, 0.9), M(0xffb84a, 0x8a4a00, 0.6), 0, 1.42, 0.02));
+    if (extra === 'stripe') g.add(mesh(Box(0.1, 0.12, 0.62), acc, 0, 1.74, 0));
+    g.add(mesh(Box(0.46, 0.55, 0.22), gray, 0, 0.9, -0.3));
+    g.add(mesh(Box(0.48, 0.08, 0.24), acc, 0, 1.0, -0.3));
+    if (extra !== 'worker') { g.add(mesh(Cyl(0.02, 0.02, 0.5, 4), dark, 0.15, 1.35, -0.34)); g.add(mesh(new THREE.SphereGeometry(0.05, 6, 4), beaconMat, 0.15, 1.62, -0.34)); }
+    let carry = null;
+    if (extra === 'worker') { carry = mesh(Box(0.5, 0.42, 0.42), M(0xf2b84b, 0x7a4a00, 0.5), 0, 1.05, -0.6); carry.visible = false; g.add(carry); }
+    g.scale.setScalar(s);
+    return { g, hipL, hipR, shL, shR, carry, vel: V(0, 0, 0) };
+  }
+  function animateWalk(a, moving, time, speed, armed) {
+    const sw = moving ? Math.sin(time * speed) * 0.7 : 0;
+    a.hipL.rotation.x = sw; a.hipR.rotation.x = -sw; a.shL.rotation.x = -sw * 0.7;
+    a.shR.rotation.x = armed ? -0.9 : sw * 0.7;
+  }
+  CMD = Object.assign(astronaut(0xff8a3d, 1), { kind: 'unit', isCmd: true, hp: CMD_HP, max: CMD_HP, r: 0.5, dead: false, respawnT: 0, cd: 0 });
+  CMD.lamp = new THREE.SpotLight(0xcfe8ff, 0, 18, 0.7, 0.5);
+  CMD.lamp.position.set(0, 1.5, 0); CMD.lamp.target.position.set(0, 0, 6);
+  CMD.g.add(CMD.lamp, CMD.lamp.target);
+  CMD.bar = makeBar(1.2);
+  scene.add(CMD.g);
+  const player = CMD.g;
+
+  // ======================= runtime collections =======================
+  const fallen = [], buildings = [], troops = [], workers = [], aliens = [], bullets = [], acids = [], shells = [], parts = [], scraps = [], shards = [], meteors = [], fires = [];
+  let S = null, started = false;
+
+  // ======================= effects =======================
+  const partGeo = Box(0.18, 0.18, 0.18), pMats = {};
+  function burst(pos, color, n, up) {
+    const mat = pMats[color] || (pMats[color] = new THREE.MeshBasicMaterial({ color }));
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(partGeo, mat); m.position.copy(pos);
+      const a = Math.random() * TAU, s = 2 + Math.random() * 4;
+      parts.push({ m, v: V(Math.cos(a) * s, (up || 3) + Math.random() * 4, Math.sin(a) * s), life: 0.5 + Math.random() * 0.4 });
+      scene.add(m);
+    }
+  }
+  const bulletGeo = new THREE.SphereGeometry(0.13, 6, 6);
+  const BMAT = { player: basic(0xffc38a), turret: basic(0xffd36e), troop: basic(0xff8f86), ice: basic(0xbfe9ff) };
+  function fire(fx, fy, fz, tx, tz, kind, dmg, slow) {
+    const m = new THREE.Mesh(bulletGeo, BMAT[kind]); m.position.set(fx, fy, fz);
+    const v = V(tx - fx, 0, tz - fz); v.normalize().multiplyScalar(26);
+    scene.add(m); bullets.push({ m, v, dmg, life: 0.9, kind, slow });
+    if (kind !== 'troop') sfx('shoot');
+  }
+  const shellMat = basic(0xff9f5a), acidMat = basic(0x9dff4f), acidGeo = new THREE.SphereGeometry(0.2, 8, 6), fireMat = basic(0xff6a1a, 0.7);
+
+  // ======================= targets & damage =======================
+  const tpos = (t) => (t.kind === 'unit' ? t.g.position : t);
+  const isGone = (t) => !t || (t.isCore ? false : t.dead);
+  let hurtFlash = 0;
+  function shielded(x, z) { return buildings.some((b) => b.t === 'escudo' && !b.dead && dist2(b.x, b.z, x, z) < auraOf(b)); }
+  function damage(t, amt) {
+    if (!t) return;
+    if (t.isCore) { S.coreHp -= amt * (P.hazard === 'acid' && shielded(0, 0) ? 0.5 : 1); coreHitT = 0.15; return; }
+    if (t.kind === 'unit') {
+      if (t.dead) return;
+      t.hp -= amt; t.hurtT = 0.18;
+      if (t.isCmd) { hurtFlash = Math.min(1, hurtFlash + amt / 35); sfx('hurt'); }
+      if (t.hp <= 0) unitDown(t);
+      return;
+    }
+    if (t.dead) return;
+    if (t.t !== 'escudo' && P.id === 'venus' && shielded(t.x, t.z)) amt *= 0.5;
+    t.hp -= amt; t.hitT = 0.15;
+    if (t.hp <= 0) destroyBuilding(t);
+  }
+  function areaDamage(x, z, rad, bAmt, uAmt) {
+    for (const b of buildings) if (!b.dead && dist2(b.x, b.z, x, z) < rad + b.r * 0.5) damage(b, bAmt);
+    for (const u of liveUnits()) if (dist2(u.g.position.x, u.g.position.z, x, z) < rad) damage(u, uAmt);
+    if (dist2(0, 0, x, z) < CORE_T.r + rad * 0.6) damage(CORE_T, bAmt * 0.6);
+  }
+  function unitDown(u) {
+    burst(u.g.position.clone().setY(1), 0xff6b5e, 12);
+    if (u.isCmd) {
+      u.dead = true; u.respawnT = 8; u.hp = 0; u.g.rotation.x = -Math.PI / 2; u.g.position.y = 0.35;
+      banner('HAS CAÍDO', 'Tu comandante vuelve al núcleo en 8 segundos'); S.shake = 0.4;
+      return;
+    }
+    u.dead = true; u.g.visible = false; u.bar.g.visible = false;
+    troops.splice(troops.indexOf(u), 1); fallen.push(u);
+    toast('Tu ' + TROOP[u.type].name.toLowerCase() + ' está herido · vuelve al amanecer');
+  }
+
+  // ======================= buildings =======================
+  function buildMesh(t) {
+    const g = new THREE.Group(), o = { g };
+    if (t === 'muro') {
+      g.add(mesh(Box(1.9, 1.1, 0.7), M(0x8c97ad), 0, 0.55, 0));
+      g.add(mesh(Box(1.96, 0.16, 0.76), M(0x5d6880), 0, 1.14, 0));
+      g.add(mesh(Box(0.3, 0.3, 0.06), glow(0xf2b84b, 0.4), 0, 0.6, 0.36));
+      o.h = 1.6;
+    } else if (t === 'torreta' || t === 'congelador') {
+      const ice = t === 'congelador';
+      g.add(mesh(Cyl(0.7, 0.9, 0.5, 8), M(ice ? 0x9fb8cc : 0x8c97ad), 0, 0.25, 0));
+      g.add(mesh(Cyl(0.22, 0.22, 0.5, 6), M(0x5d6880), 0, 0.7, 0));
+      const h = new THREE.Group(); h.position.y = 1.05;
+      h.add(mesh(Box(0.8, 0.45, 0.8), M(ice ? 0xeaf6ff : 0xd6dcea)));
+      h.add(mesh(Box(0.82, 0.08, 0.82), ice ? glow(0x6fe3ff, 0.6) : M(0xf2b84b), 0, 0.2, 0));
+      if (ice) { const b = mesh(Cyl(0.13, 0.18, 0.9, 6), glow(0xbfe9ff, 0.7), 0, 0, 0.55); b.rotation.x = Math.PI / 2; h.add(b); }
+      else [-0.16, 0.16].forEach((x) => { const b = mesh(Cyl(0.07, 0.07, 0.8, 6), M(0x2c3446), x, 0, 0.55); b.rotation.x = Math.PI / 2; h.add(b); });
+      g.add(h); o.head = h; o.h = 2;
+    } else if (t === 'laser' || t === 'espejo') {
+      if (t === 'laser') {
+        g.add(mesh(Cyl(0.75, 0.9, 0.4, 6), M(0x6b7489), 0, 0.2, 0));
+        g.add(mesh(Cyl(0.22, 0.4, 2.1, 6), M(0xd6dcea), 0, 1.45, 0));
+        const ring = mesh(new THREE.TorusGeometry(0.45, 0.07, 6, 16), glow(0x6fe3ff, 0.9), 0, 2.55, 0); ring.rotation.x = Math.PI / 2; g.add(ring); o.ring = ring;
+        g.add(mesh(new THREE.OctahedronGeometry(0.26), glow(0x6fe3ff, 1.1), 0, 2.85, 0)); o.tipY = 2.85; o.h = 3.4;
+      } else {
+        g.add(mesh(Cyl(0.6, 0.85, 0.5, 8), M(0x6b7489), 0, 0.25, 0));
+        g.add(mesh(Cyl(0.12, 0.12, 1.3, 6), M(0xd6dcea), 0, 1.1, 0));
+        const dish = mesh(new THREE.SphereGeometry(1.0, 14, 6, 0, TAU, 0, 0.9), M(0xfff6d8, 0xffe9a0, 0.4), 0, 1.6, 0); dish.rotation.x = Math.PI; dish.scale.y = 0.4; g.add(dish);
+        g.add(mesh(new THREE.OctahedronGeometry(0.22), glow(0xfff1a8, 1.2), 0, 2.2, 0)); o.tipY = 2.2; o.h = 2.8;
+      }
+      const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
+      o.beam = new THREE.Line(bg, new THREE.LineBasicMaterial({ color: DEF[t].beam })); o.beam.visible = false; o.beam.frustumCulled = false; scene.add(o.beam); o.beamT = 0;
+    } else if (t === 'mortero') {
+      g.add(mesh(Box(1.7, 0.5, 1.7), M(0x6b7489), 0, 0.25, 0));
+      g.add(mesh(Box(1.74, 0.1, 1.74), M(0xff9f5a), 0, 0.52, 0));
+      const h = new THREE.Group(); h.position.y = 0.75;
+      h.add(mesh(Cyl(0.55, 0.6, 0.45, 8), M(0x8c97ad)));
+      const tube = mesh(Cyl(0.22, 0.3, 1.2, 8), M(0x3b4458), 0, 0.45, 0.3); tube.rotation.x = 0.75; h.add(tube);
+      g.add(h); o.head = h; o.h = 2.2;
+    } else if (t === 'mina') {
+      g.add(mesh(Box(1.7, 0.35, 1.7), M(0x6b7489), 0, 0.17, 0));
+      [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]].forEach(([x, z]) => g.add(mesh(Cyl(0.06, 0.06, 1.7, 4), M(0x5d6880), x, 1.15, z)));
+      g.add(mesh(Box(1.6, 0.16, 1.6), M(0xf2b84b), 0, 2.0, 0));
+      const drill = mesh(new THREE.ConeGeometry(0.38, 1.1, 6), M(0xd6dcea), 0, 0.95, 0); drill.rotation.x = Math.PI; g.add(drill); o.drill = drill;
+      o.pile = mesh(new THREE.DodecahedronGeometry(0.4, 0), M(0xf2b84b, 0x7a4a00, 0.5), 0.95, 0.35, 0.95); g.add(o.pile);
+      o.icon = mesh(new THREE.OctahedronGeometry(0.32), glow(0xf2b84b, 1), 0, 2.7, 0); g.add(o.icon);
+      o.h = 3.3;
+    } else if (t === 'habitat') {
+      g.add(mesh(Cyl(1.3, 1.4, 0.4, 12), M(0x6b7489), 0, 0.2, 0));
+      g.add(mesh(new THREE.SphereGeometry(1.18, 14, 8, 0, TAU, 0, Math.PI / 2), M(0xf2f4f8), 0, 0.4, 0));
+      g.add(mesh(Cyl(1.2, 1.2, 0.2, 14), glow(0x4fb8ff, 0.5), 0, 0.72, 0));
+      g.add(mesh(Box(0.55, 0.75, 0.3), M(0x2c3446), 0, 0.55, 1.12));
+      g.add(mesh(Box(0.6, 0.08, 0.34), M(0xff8a3d), 0, 0.96, 1.12));
+      o.h = 2;
+    } else if (t === 'cuartel') {
+      g.add(mesh(Box(2.6, 0.3, 2.2), M(0x5d6880), 0, 0.15, 0));
+      const hall = mesh(new THREE.CylinderGeometry(1.05, 1.05, 2.4, 10, 1, false, 0, Math.PI), M(0x8c97ad), 0, 0.3, 0);
+      hall.rotation.z = Math.PI / 2; hall.rotation.y = Math.PI / 2; hall.position.y = 0.3; g.add(hall);
+      g.add(mesh(Box(0.9, 0.85, 0.12), M(0x2c3446), 0, 0.73, 1.16));
+      g.add(mesh(Box(2.5, 0.1, 0.1), M(0xe0483e), 0, 1.36, 0));
+      g.add(mesh(Cyl(0.04, 0.04, 2.2, 4), M(0xd6dcea), 1.1, 1.4, -0.8));
+      const flag = mesh(Box(0.7, 0.42, 0.04), M(0xe0483e), 1.47, 2.25, -0.8); g.add(flag); o.flag = flag;
+      o.h = 2.8;
+    } else if (t === 'escudo') {
+      g.add(mesh(Cyl(0.7, 0.9, 0.5, 8), M(0x6b7489), 0, 0.25, 0));
+      g.add(mesh(new THREE.OctahedronGeometry(0.4), glow(0x9fe8ff, 1), 0, 1.1, 0));
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12, 0, TAU, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.13, depthWrite: false, side: THREE.DoubleSide }));
+      g.add(dome); o.dome = dome; o.h = 2;
+    } else if (t === 'pararrayos') {
+      g.add(mesh(Cyl(0.5, 0.7, 0.4, 6), M(0x6b7489), 0, 0.2, 0));
+      g.add(mesh(Cyl(0.07, 0.1, 4, 6), M(0xd6dcea), 0, 2.2, 0));
+      for (let i = 0; i < 3; i++) { const c = mesh(new THREE.TorusGeometry(0.28, 0.05, 5, 14), M(0xc98a3a), 0, 1.4 + i * 0.5, 0); c.rotation.x = Math.PI / 2; g.add(c); }
+      o.tip = mesh(new THREE.SphereGeometry(0.22, 10, 8), glow(0xffe14f, 1), 0, 4.3, 0); g.add(o.tip);
+      o.h = 4.8; o.auraRing = true;
+    } else if (t === 'calefactor') {
+      g.add(mesh(Box(1.4, 1.1, 1.4), M(0x6b7489), 0, 0.55, 0));
+      for (let i = 0; i < 4; i++) g.add(mesh(Box(1.42, 0.08, 1.42), glow(0xff7a3d, 0.9), 0, 0.3 + i * 0.22, 0));
+      g.add(mesh(Cyl(0.18, 0.22, 0.8, 8), M(0x3b4458), 0.35, 1.5, 0.35));
+      o.h = 2.2; o.auraRing = true;
+    } else if (t === 'turbina') {
+      g.add(mesh(Cyl(0.5, 0.7, 0.4, 6), M(0x6b7489), 0, 0.2, 0));
+      g.add(mesh(Cyl(0.12, 0.18, 3.2, 6), M(0xd6dcea), 0, 1.8, 0));
+      const hub = new THREE.Group(); hub.position.set(0, 3.4, 0.3);
+      hub.add(mesh(new THREE.SphereGeometry(0.2, 8, 6), M(0xd6dcea)));
+      for (let i = 0; i < 3; i++) { const bl = mesh(Box(0.18, 1.5, 0.05), M(0xf2f4f8), 0, 0.75, 0); const arm = new THREE.Group(); arm.rotation.z = i / 3 * TAU; arm.add(bl); hub.add(arm); }
+      g.add(hub); o.hub = hub; o.h = 4.4;
+    } else if (t === 'faro') {
+      g.add(mesh(Cyl(0.45, 0.6, 0.4, 8), M(0x6b7489), 0, 0.2, 0));
+      g.add(mesh(Cyl(0.18, 0.25, 2.6, 8), M(0xe6e1d8), 0, 1.6, 0));
+      g.add(mesh(Cyl(0.35, 0.35, 0.45, 8), glow(0xfff1a8, 1.3), 0, 3.1, 0));
+      g.add(mesh(new THREE.ConeGeometry(0.42, 0.4, 8), M(0xe0483e), 0, 3.55, 0));
+      o.h = 3.9; o.light = true;
+    }
+    return o;
+  }
+  const lvColor = [0, 0x6fe3ff, 0xf2b84b];
+  const auraOf = (b) => (b.d.aura || 0) * LV_AURA[b.lv - 1];
+  function applyLevel(b) {
+    const s = LV_SCALE[b.lv - 1]; b.g.scale.setScalar(s); b.baseScale = s;
+    if (b.deco) { b.g.remove(b.deco); b.deco = null; }
+    if (b.lv > 1) {
+      const d = new THREE.Group(), mat = glow(lvColor[b.lv - 1], 0.9);
+      if (b.d.wall) d.add(mesh(Box(1.98, 0.1, 0.78), mat, 0, 0.92, 0));
+      else { const ring = mesh(new THREE.TorusGeometry(b.d.r * 0.98, 0.06, 6, 28), mat, 0, 0.1, 0); ring.rotation.x = Math.PI / 2; d.add(ring); }
+      for (let i = 0; i < b.lv; i++) { const ch = mesh(Box(0.15, 0.15, 0.15), mat, (i - (b.lv - 1) / 2) * 0.26, b.d.wall ? 1.35 : 0.32, b.d.wall ? 0 : b.d.r * 1.0); ch.rotation.z = Math.PI / 4; d.add(ch); }
+      b.g.add(d); b.deco = d;
+    }
+    // aura visuals live in world space (not scaled with the building)
+    if (b.d.aura) {
+      const a = auraOf(b);
+      if (b.dome) b.dome.scale.set(a / s, a / s * 0.6, a / s);
+      if (b.auraM) scene.remove(b.auraM);
+      if (b.auraRing || b.light) {
+        const col = b.t === 'faro' ? 0xfff1a8 : b.t === 'calefactor' ? 0xff9f5a : 0xffe14f;
+        b.auraM = b.light ? flat(new THREE.CircleGeometry(a, 40), basic(col, 0.1), b.x, 0.07, b.z) : flat(new THREE.RingGeometry(a - 0.12, a, 48), basic(col, 0.35), b.x, 0.07, b.z);
+        scene.add(b.auraM);
+      }
+    }
+    const wasMax = b.max || 0;
+    b.max = Math.round(b.d.hp * (b.d.wall ? LV_WALL : LV_HP)[b.lv - 1]);
+    b.hp = b.hp == null ? b.max : Math.min(b.max, b.hp + (b.max - wasMax));
+    b.r = b.d.r * s;
+  }
+  const dmgOf = (b, lv) => b.d.dmg * LV_DMG[(lv || b.lv) - 1];
+  const rangeOf = (b, lv) => (b.d.range + LV_RANGE[(lv || b.lv) - 1]) * (S && S.dust ? 0.7 : 1);
+  const prodOf = (b, lv) => b.d.rate * LV_PROD[(lv || b.lv) - 1] * (b.t === 'mina' ? P.mineMult || 1 : 1);
+  const capOf = (b, lv) => Math.round(b.d.cap * LV_PROD[(lv || b.lv) - 1] * (P.mineMult || 1));
+  function addBuilding(t, x, z, lv, store) {
+    const d = DEF[t], o = buildMesh(t);
+    o.g.position.set(x, 0, z);
+    o.g.rotation.y = t === 'muro' ? Math.atan2(x, z) : Math.atan2(-x, -z);
+    scene.add(o.g);
+    const b = Object.assign({ t, d, x, z, lv: lv || 1, hp: null, max: 0, cd: Math.random() * 0.5, store: store || 0, dead: false, hitT: 0 }, o);
+    b.g.userData.b = b;
+    applyLevel(b);
+    b.bar = makeBar(1.6);
+    if (P.hazard === 'cold' && d.range) { b.frost = mesh(new THREE.TorusGeometry(d.r * 0.9, 0.12, 5, 20), glow(0xbfe9ff, 0.8), 0, 0.3, 0); b.frost.rotation.x = Math.PI / 2; b.g.add(b.frost); b.frost.visible = false; }
+    buildings.push(b);
+    if (t === 'habitat') syncWorkers(b);
+    return b;
+  }
+  const rubbleMat = M(0x3a3f4d);
+  function destroyBuilding(b) {
+    b.dead = true; b.g.visible = false; b.bar.g.visible = false; if (b.auraM) b.auraM.visible = false;
+    const r = new THREE.Group();
+    for (let i = 0; i < 5; i++) { const m = mesh(Box(0.35 + Math.random() * 0.3, 0.2, 0.35), rubbleMat, (Math.random() - 0.5) * 1.4, 0.1, (Math.random() - 0.5) * 1.4); m.rotation.y = Math.random() * 3; r.add(m); }
+    r.position.set(b.x, 0, b.z); scene.add(r); b.rubble = r;
+    burst(V(b.x, 1, b.z), 0xd6dcea, 16); S.shake = Math.max(S.shake, 0.25); sfx('boom');
+    if (b.beam) b.beam.visible = false;
+    toast(b.d.name + ' destruido');
+  }
+  function restoreAll() {
+    for (const b of buildings) { if (b.rubble) { scene.remove(b.rubble); b.rubble = null; } b.dead = false; b.g.visible = true; b.hp = b.max; if (b.auraM) b.auraM.visible = true; }
+  }
+  const count = (t) => buildings.filter((b) => b.t === t).length;
+  const limit = (t) => LIMITS[t][G.coreLv - 1];
+  const coreMax = () => CORE[G.coreLv - 1].hp;
+  const barracks = () => buildings.find((b) => b.t === 'cuartel');
+  const troopCap = () => { const c = barracks(); return c ? CAP[c.lv - 1] : 0; };
+  function defenseScore() {
+    let s = 0;
+    for (const b of buildings) { if (b.d.def) s += b.d.def * LV_DMG[b.lv - 1]; if (b.d.wall) s += 0.1 * b.lv; }
+    return s + (troops.length + fallen.length) * 0.6;
+  }
+  const heated = (b) => buildings.some((h) => h.t === 'calefactor' && !h.dead && dist2(h.x, h.z, b.x, b.z) < auraOf(h));
+
+  // ======================= workers (colonos) =======================
+  function syncWorkers(h) {
+    const want = WORKERS[h.lv - 1], have = workers.filter((w) => w.home === h).length;
+    for (let i = have; i < want; i++) {
+      const a = astronaut(0x4fb8ff, 0.62, 'worker');
+      const w = Object.assign(a, { home: h, state: 'idle', mine: null, load: 0, wait: Math.random() * 2, tx: h.x, tz: h.z, moving: false });
+      a.g.position.set(h.x + (Math.random() - 0.5) * 3, 0, h.z + 2); scene.add(a.g); workers.push(w);
+    }
+  }
+
+  // ======================= troops =======================
+  function spawnTroop(type, x, z) {
+    const td = TROOP[type], hp = Math.round(td.hp * (1 + 0.2 * labLv('tropas')));
+    const a = astronaut(td.accent, 0.78, type === 'ingeniero' ? 'tool' : 'stripe');
+    const u = Object.assign(a, { kind: 'unit', type, td, hp, max: hp, r: 0.4, dead: false, cd: Math.random() * 0.5, hurtT: 0, moving: false });
+    u.bar = makeBar(0.9);
+    a.g.position.set(x, 0, z); scene.add(a.g); troops.push(u);
+    return u;
+  }
+  function trainTroop(type) {
+    const c = barracks(), td = TROOP[type];
+    if (!c || troops.length + fallen.length >= troopCap() || G.scrap < td.cost) return;
+    G.scrap -= td.cost;
+    spawnTroop(type, c.x + (Math.random() - 0.5) * 2, c.z + 2.2);
+    burst(V(c.x, 1.2, c.z + 1.5), td.accent, 10); sfx('build');
+    persist();
+  }
+  const holdFlag = new THREE.Group();
+  holdFlag.add(mesh(Cyl(0.05, 0.05, 2, 4), M(0xd6dcea), 0, 1, 0));
+  holdFlag.add(mesh(Box(0.7, 0.42, 0.04), M(0xe0483e), 0.37, 1.75, 0));
+  const holdRing = flat(new THREE.RingGeometry(2.8, 3, 40), basic(0xe0483e, 0.5), 0, 0.07, 0); holdFlag.add(holdRing);
+  holdFlag.visible = false; scene.add(holdFlag);
+
+  // ======================= aliens =======================
+  const eyeMat = basic(0xffffff), pupilMat = basic(0x111111), hitMat = basic(0xffffff), darkEye = basic(0xff3b6b);
+  const alienMats = {};
+  const amat = (d) => alienMats[d.col] || (alienMats[d.col] = new THREE.MeshStandardMaterial({ color: d.col, emissive: d.col, emissiveIntensity: 0.75, flatShading: true }));
+  function alienRig(type, d) {
+    const rig = new THREE.Group(), mat = amat(d); let body, wings = null, legs = null;
+    const r = d.r;
+    if (type === 'veloz' || type === 'tiburon') {
+      body = mesh(new THREE.ConeGeometry(r, r * 2.4, 5), mat, 0, r, 0); body.rotation.x = Math.PI / 2; rig.add(body);
+      if (type === 'tiburon') { const fin = mesh(new THREE.ConeGeometry(0.18, 0.6, 4), M(0x2a3f8a), 0, r * 1.9, -0.1); rig.add(fin); }
+    } else if (type === 'escupidor') {
+      body = mesh(new THREE.SphereGeometry(r, 10, 8), mat, 0, r, 0); rig.add(body);
+      const tube = mesh(Cyl(0.12, 0.2, 0.5, 8), M(0x3a1f6b), 0, r * 1.05, r * 0.9); tube.rotation.x = Math.PI / 2; rig.add(tube);
+      rig.add(mesh(new THREE.SphereGeometry(r * 0.55, 8, 6), glow(0x9dff4f, 0.9), 0, r * 1.45, -r * 0.55));
+    } else if (type === 'acorazado') {
+      body = mesh(new THREE.IcosahedronGeometry(r, 0), mat, 0, r, 0); rig.add(body);
+      for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; const pl = mesh(Box(0.6, 0.55, 0.14), M(0x59606f), Math.cos(a) * r * 0.92, r * 1.05, Math.sin(a) * r * 0.92); pl.rotation.y = -a + Math.PI / 2; rig.add(pl); }
+      rig.add(mesh(Box(0.75, 0.2, 0.65), M(0x59606f), 0, r * 1.9, 0));
+    } else if (type === 'volador') {
+      body = mesh(new THREE.OctahedronGeometry(r), mat, 0, 0, 0); rig.add(body);
+      const wm = glow(0xfff3a0, 0.5), wl = mesh(Box(0.9, 0.04, 0.45), wm, -0.6, 0.05, 0), wr = mesh(Box(0.9, 0.04, 0.45), wm, 0.6, 0.05, 0);
+      rig.add(wl, wr); wings = [wl, wr];
+    } else if (type === 'salamandra') {
+      body = mesh(Box(0.55, 0.4, 1.1), mat, 0, 0.35, 0); rig.add(body);
+      const tail = mesh(new THREE.ConeGeometry(0.2, 0.8, 5), glow(0xffb84a, 0.9), 0, 0.35, -0.9); tail.rotation.x = -Math.PI / 2; rig.add(tail);
+    } else if (type === 'kamikaze') {
+      body = mesh(new THREE.SphereGeometry(r, 10, 6, 0, TAU, 0, Math.PI / 2), mat, 0, 0.1, 0); rig.add(body);
+      rig.add(mesh(new THREE.SphereGeometry(r * 0.45, 8, 6), glow(0xff3b1a, 1.2), 0, r * 0.7, 0));
+    } else if (type === 'trepador') {
+      body = mesh(new THREE.SphereGeometry(r, 10, 8), mat, 0, r + 0.2, 0); rig.add(body);
+      legs = [];
+      for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; const lg = mesh(Box(0.08, 0.08, 0.7), M(0x3a6b1f), Math.cos(a) * 0.45, 0.25, Math.sin(a) * 0.45); lg.rotation.y = -a; legs.push(lg); rig.add(lg); }
+    } else if (type === 'nube') {
+      const cm = new THREE.MeshStandardMaterial({ color: d.col, emissive: d.col, emissiveIntensity: 0.4, transparent: true, opacity: 0.75, flatShading: true });
+      body = mesh(new THREE.SphereGeometry(r, 10, 8), cm, 0, 0, 0); rig.add(body);
+      rig.add(mesh(new THREE.SphereGeometry(r * 0.7, 8, 6), cm, r * 0.7, -0.1, 0.1), mesh(new THREE.SphereGeometry(r * 0.6, 8, 6), cm, -r * 0.7, -0.05, -0.1));
+    } else if (type === 'medusa') {
+      body = mesh(new THREE.SphereGeometry(r, 12, 8, 0, TAU, 0, Math.PI / 2), mat, 0, 0, 0); rig.add(body);
+      legs = [];
+      for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; const tn = mesh(Cyl(0.04, 0.02, 1, 4), glow(0x9fe8ff, 0.8), Math.cos(a) * r * 0.6, -0.5, Math.sin(a) * r * 0.6); legs.push(tn); rig.add(tn); }
+    } else if (type === 'cristalino' || type === 'cristalito') {
+      body = mesh(new THREE.OctahedronGeometry(r), mat, 0, r * 1.1, 0); body.scale.y = 1.4; rig.add(body);
+    } else if (type === 'sombra') {
+      body = mesh(new THREE.IcosahedronGeometry(r, 0), M(0x1a1426, 0x8a5cff, 0.3), 0, r, 0); rig.add(body);
+    } else {
+      body = mesh(new THREE.IcosahedronGeometry(r, 0), mat, 0, r, 0); rig.add(body);
+      if (type === 'jefe') for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; const s = mesh(new THREE.ConeGeometry(0.22, 0.8, 5), M(0x3a2a2a), Math.cos(a) * 0.9, r * 1.7, Math.sin(a) * 0.9); s.rotation.z = Math.cos(a) * -0.5; s.rotation.x = Math.sin(a) * 0.5; rig.add(s); }
+    }
+    const ey = d.fly ? 0.12 : type === 'salamandra' ? 0.5 : type === 'kamikaze' ? 0.3 : r * 1.25, ez = d.fly ? r * 0.62 : type === 'salamandra' ? 0.55 : r * 0.72;
+    [-1, 1].forEach((s) => {
+      rig.add(mesh(new THREE.SphereGeometry(r * 0.2, 6, 5), type === 'sombra' ? darkEye : eyeMat, s * r * 0.35, ey, ez));
+      if (type !== 'sombra') rig.add(mesh(new THREE.SphereGeometry(r * 0.09, 5, 4), pupilMat, s * r * 0.35, ey, ez + r * 0.17));
+    });
+    return { rig, body, wings, legs, mat };
+  }
+  function spawnAlien(type, x, z, guard) {
+    const d = ALIEN[type], g = new THREE.Group(), r = alienRig(type, d);
+    g.add(r.rig); g.position.set(x, 0, z); scene.add(g);
+    let eyes = null;
+    if (P.hazard === 'dark') { eyes = new THREE.Group(); [-1, 1].forEach((s) => eyes.add(new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 4), darkEye))); eyes.children[0].position.set(-0.16, d.r * 1.25 + (d.fly ? 1.9 : 0), d.r * 0.7); eyes.children[1].position.set(0.16, d.r * 1.25 + (d.fly ? 1.9 : 0), d.r * 0.7); g.add(eyes); }
+    const hp = d.hp * (1 + G.nights * 0.2) * HP_MUL * (type === 'jefe' ? 1 + PIDX * 0.25 : 1);
+    const a = { g, rig: r.rig, body: r.body, bodyMat: r.body.material, wings: r.wings, legs: r.legs, eyes, type, d, hp, max: hp, flash: 0, bob: Math.random() * 6, tgt: null, retarget: 0, atkT: d.rate * 0.5, lunge: 0, blockT: 0, stillT: 0, ghostT: 0, slowT: 0, burnT: 0, lit: true, guard: guard || null, bar: hp >= 10 ? makeBar(1.4) : null };
+    aliens.push(a);
+    burst(V(x, 0.4, z), d.col, 6);
+    if (!W.seen[type] && d.desc) { W.seen[type] = 1; toast('Nuevo alienígena: ' + d.name + '. ' + d.desc, 'new'); }
+    return a;
+  }
+  function removeAlien(a) { scene.remove(a.g); killBar(a.bar); const i = aliens.indexOf(a); if (i >= 0) aliens.splice(i, 1); }
+  function liveUnits() { const u = troops.slice(); if (!CMD.dead) u.push(CMD); return u; }
+  function chooseTarget(a) {
+    const p = a.g.position, t = a.type;
+    const unitR = a.d.hunter ? 13 : a.d.range ? 8.5 : 4.5;
+    let best = null, bd = Infinity;
+    for (const u of liveUnits()) { const d = dist2(u.g.position.x, u.g.position.z, p.x, p.z); if (d < unitR && d < bd) { bd = d; best = u; } }
+    if (best) return best;
+    best = CORE_T; bd = dist2(p.x, p.z, 0, 0) - CORE_T.r;
+    for (const b of buildings) {
+      if (b.dead || b.d.wall) continue;
+      let d = dist2(p.x, p.z, b.x, b.z) - b.r;
+      if (t === 'veloz' && !(b.t === 'mina' || b.t === 'habitat' || b.t === 'cuartel')) d += 8;
+      if ((t === 'acorazado' || t === 'jefe') && !b.d.def) d += 8;
+      if (t === 'volador' && b.t !== 'mina') d += 6;
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+  const targetable = (a) => P.hazard !== 'dark' || a.lit;
+  function nearestAlien(x, z, range, minR, noFly) {
+    let best = null, bd = range;
+    for (const a of aliens) {
+      if ((noFly && a.d.fly) || !targetable(a)) continue;
+      const d = dist2(a.g.position.x, a.g.position.z, x, z) - a.d.r;
+      if (d < bd && (!minR || d > minR)) { bd = d; best = a; }
+    }
+    return best;
+  }
+  function hurtAlien(a, dmg) {
+    if (!aliens.includes(a)) return;
+    a.hp -= dmg; a.flash = 0.08;
+    if (a.hp <= 0) killAlien(a);
+  }
+  function killAlien(a) {
+    const p = a.g.position, y = a.d.fly ? 1.9 : a.d.r;
+    gain(a.d.drop * (1 + 0.3 * (U - 1)), p.x, y + 1, p.z, a.type === 'jefe');
+    if (a.d.cry) gainC(a.d.cry, p.x, y + 2, p.z);
+    burst(p.clone().setY(y), a.d.col, a.type === 'jefe' ? 30 : 8); sfx('kill');
+    if (a.type === 'jefe') { toast('¡' + a.d.name + ' derrotado!', 'good'); S.shake = 0.4; }
+    if (a.d.split) for (let i = 0; i < 2; i++) spawnAlien('cristalito', p.x + (i ? 0.6 : -0.6), p.z, a.guard);
+    if (a.d.explode && a.tgt) areaDamage(p.x, p.z, 1.6, 6, 6);
+    removeAlien(a);
+  }
+
+  // ======================= points of interest (outside the colony) =======================
+  function freeSpot(avoid) {
+    for (let k = 0; k < 80; k++) {
+      const a = Math.random() * TAU, r = COLONY + 5 + Math.random() * (WORLD - COLONY - 8), x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (avoid.every((u) => dist2(u.x, u.z, x, z) > 9)) return { x: +x.toFixed(2), z: +z.toFixed(2) };
+    }
+    return { x: 0, z: COLONY + 8 };
+  }
+  if (!G.pois) {
+    const used = [];
+    const spot = () => { const s = freeSpot(used); used.push(s); return s; };
+    G.pois = { deposits: [0, 1, 2].map(() => Object.assign(spot(), { ready: true, regrow: 0 })), nest: Object.assign(spot(), { alive: true, regrow: 0 }), wreck: Object.assign(spot(), { ready: true, regrow: 0 }) };
+  }
+  const allPoiSpots = () => [...G.pois.deposits, G.pois.nest, G.pois.wreck];
+  const crysMat = glow(0x6fe3ff, 0.9), crysDim = M(0x4a6b7a);
+  const DEP = G.pois.deposits.map((data) => {
+    const g = new THREE.Group(), shardsArr = [];
+    for (let i = 0; i < 6; i++) { const h = 0.8 + Math.random() * 1.4; const c = mesh(new THREE.ConeGeometry(0.28, h, 5), crysMat, (Math.random() - 0.5) * 1.6, h / 2, (Math.random() - 0.5) * 1.6); c.rotation.z = (Math.random() - 0.5) * 0.6; c.rotation.x = (Math.random() - 0.5) * 0.6; g.add(c); shardsArr.push(c); }
+    g.add(mesh(new THREE.DodecahedronGeometry(0.9, 0), rockMat, 0, 0.2, 0));
+    const col = beam(0x6fe3ff, 14, 0.3); g.add(col);
+    g.position.set(data.x, 0, data.z); scene.add(g);
+    return { data, g, shards: shardsArr, col, prog: 0, bar: makeBar(1.4) };
+  });
+  function refreshDeposit(D) {
+    const on = D.data.ready;
+    D.shards.forEach((c) => { c.material = on ? crysMat : crysDim; c.scale.setScalar(on ? 1 : 0.35); });
+    D.col.visible = on;
+  }
+  DEP.forEach(refreshDeposit);
+  const NEST = (() => {
+    const g = new THREE.Group();
+    g.add(mesh(new THREE.SphereGeometry(1.6, 12, 8, 0, TAU, 0, Math.PI / 2), M(0x6b1f5c, 0xff4fd8, 0.25), 0, 0, 0));
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; const s = mesh(new THREE.ConeGeometry(0.25, 1.4, 5), M(0x3d1035), Math.cos(a) * 1.4, 0.5, Math.sin(a) * 1.4); s.rotation.z = Math.cos(a) * -0.6; s.rotation.x = Math.sin(a) * 0.6; g.add(s); }
+    const eyeN = mesh(new THREE.SphereGeometry(0.45, 10, 8), glow(0xff4fd8, 1.1), 0, 1.4, 0); g.add(eyeN);
+    const col = beam(0xff4fd8, 14, 0.3); g.add(col);
+    g.add(flat(new THREE.CircleGeometry(2.4, 18), basic(0x3d1035, 0.7), 0, 0.05, 0));
+    scene.add(g);
+    return { g, eye: eyeN, col, hp: 0, max: 0, guardT: 0, bar: makeBar(1.8), r: 1.6, x: 0, z: 0 };
+  })();
+  function placeNest() {
+    const n = G.pois.nest; NEST.g.position.set(n.x, 0, n.z); NEST.g.visible = n.alive;
+    NEST.max = (30 + G.nights * 6) * HP_MUL; NEST.hp = NEST.max; NEST.x = n.x; NEST.z = n.z;
+  }
+  placeNest();
+  const WRECK = (() => {
+    const g = new THREE.Group();
+    const hull = mesh(Cyl(0.9, 1.2, 4, 8), M(0x8c97ad), 0, 0.6, 0); hull.rotation.z = Math.PI / 2 - 0.25; hull.rotation.y = 0.4; g.add(hull);
+    const wing = mesh(Box(2.6, 0.12, 1.1), M(0x6b7489), 0.8, 0.3, 1.2); wing.rotation.set(0.3, 0.4, 0.2); g.add(wing);
+    g.add(mesh(Box(0.4, 0.4, 0.4), M(0x3a3f4d), -1.6, 0.2, -0.8));
+    const crate = new THREE.Group(); crate.position.set(1.6, 0, -1);
+    crate.add(mesh(Box(0.9, 0.6, 0.7), M(0x8a6a3a), 0, 0.3, 0));
+    const lid = mesh(Box(0.94, 0.12, 0.74), M(0xf2b84b), 0, 0.66, 0); crate.add(lid);
+    crate.add(mesh(Box(0.2, 0.2, 0.05), glow(0xf2b84b, 1), 0, 0.35, 0.36));
+    g.add(crate);
+    const col = beam(0xf2b84b, 14, 0.3); col.position.x = 1.6; col.position.z = -1; g.add(col);
+    scene.add(g);
+    return { g, lid, col, crate };
+  })();
+  function placeWreck() {
+    const w = G.pois.wreck; WRECK.g.position.set(w.x, 0, w.z);
+    WRECK.col.visible = w.ready; WRECK.lid.rotation.x = w.ready ? 0 : -1.2; WRECK.lid.position.z = w.ready ? 0 : -0.3;
+  }
+  placeWreck();
+  function refreshPois() {
+    let changed = false;
+    G.pois.deposits.forEach((d, i) => { if (!d.ready && G.nights >= d.regrow) { d.ready = true; refreshDeposit(DEP[i]); changed = true; } });
+    const n = G.pois.nest;
+    if (!n.alive && G.nights >= n.regrow) { Object.assign(n, freeSpot(allPoiSpots().filter((p) => p !== n)), { alive: true }); placeNest(); changed = true; }
+    const w = G.pois.wreck;
+    if (!w.ready && G.nights >= w.regrow) { Object.assign(w, freeSpot(allPoiSpots().filter((p) => p !== w)), { ready: true }); placeWreck(); changed = true; }
+    return changed;
+  }
+
+  // ======================= persistence =======================
+  function persist() {
+    G.buildings = buildings.map((b) => ({ t: b.t, x: b.x, z: b.z, lv: b.lv, store: Math.floor(b.store || 0) }));
+    const all = troops.concat(fallen);
+    G.troops = { soldado: all.filter((t) => t.type === 'soldado').length, ingeniero: all.filter((t) => t.type === 'ingeniero').length };
+    G.lastSeen = Date.now();
+    W.colonies[P.id] = G;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(W)); } catch (e) {}
+  }
+
+  // ======================= UI helpers =======================
+  let toastTimer = 0, bannerTimer = 0;
+  function toast(text, kind) {
+    const e = $('#toast'); e.textContent = text; e.className = 'show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { e.className = kind || ''; }, kind === 'new' ? 3600 : 1900);
+  }
+  function banner(big, small) {
+    const e = $('#banner'); e.textContent = big;
+    if (small) e.append(el('small', null, small));
+    e.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => e.classList.remove('show'), 2700);
+  }
+  function costNode(s, c) {
+    const w = el('span');
+    if (s) { const a = el('span', 'cost'); a.append(el('span', 'gem scrap'), document.createTextNode(String(s))); w.append(a); }
+    if (c) { const b = el('span', 'cost'); b.append(el('span', 'gem crystal'), document.createTextNode(String(c))); w.append(b); }
+    return w;
+  }
+  const fmt = (t) => { const s = Math.max(0, Math.ceil(t)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function fmtDur(sec) { const m = Math.round(sec / 60); if (m < 60) return m + ' min'; const h = Math.floor(m / 60), r = m % 60; return h + ' h' + (r ? ' ' + r + ' min' : ''); }
+  const PANELS = ['#corePanel', '#bPanel', '#reportPanel', '#menuPanel', '#startScreen', '#mapPanel'];
+  const anyPanelOpen = () => PANELS.some((p) => !$(p).hidden);
+  function hazardText() {
+    if (!S) return '';
+    if (S.dust) return 'Tormenta de polvo: alcance −30%';
+    if (P.hazard === 'acid' && S.rain) return 'Lluvia ácida: busca los escudos';
+    if (P.hazard === 'wind' && S.gust > 0) return 'Racha de huracán';
+    if (P.hazard === 'heat' && S.phase === 'day') return 'Calor extremo fuera de la colonia';
+    if (P.hazard === 'lightning') return 'Tormenta eléctrica';
+    if (P.hazard === 'cold') return 'Frío: usa calefactores';
+    if (P.hazard === 'dark') return 'Oscuridad: ilumina con faros';
+    if (P.hazard === 'ice') return 'Suelo helado';
+    return '';
+  }
+  function updateHint() {
+    if (!S) return;
+    let h = '';
+    if (S.placing) h = '';
+    else if (CMD.dead) h = 'Tu comandante se está recuperando en el núcleo';
+    else if (S.phase === 'day') {
+      if (S.rifts.length) h = 'Los portales morados marcan por dónde atacarán esta noche';
+      else h = (isTouch ? 'Arrastra para moverte' : 'WASD o flechas para moverte') + ' · Toca un edificio para mejorarlo · Sal del círculo para explorar';
+    } else h = 'Defiende la colonia · Tu comandante y tus tropas disparan solos';
+    $('#hint').textContent = h;
+  }
+  function hud() {
+    $('#scrap').textContent = Math.floor(G.scrap);
+    $('#crys').textContent = G.crys;
+    $('#troopChip').hidden = !barracks() && !troops.length && !fallen.length;
+    $('#troopCount').textContent = troops.length + (fallen.length ? ' (+' + fallen.length + ' heridos)' : '') + ' / ' + troopCap();
+    const max = coreMax(), pct = clamp(S.coreHp / max, 0, 1);
+    $('#coreLbl').textContent = 'Núcleo · nivel ' + G.coreLv;
+    $('#coreTxt').textContent = Math.ceil(Math.max(0, S.coreHp)) + ' / ' + max;
+    const bar = $('#coreBar'); bar.style.width = (pct * 100).toFixed(1) + '%'; bar.style.background = pct < 0.3 ? 'var(--danger)' : 'var(--core)';
+    const chip = $('#timerChip');
+    if (S.phase === 'day') { chip.classList.remove('night'); $('#timerLbl').textContent = P.name + ' · próximo ataque en'; $('#timer').textContent = fmt(S.t); }
+    else {
+      chip.classList.add('night'); $('#timerLbl').textContent = P.name + ' · noche ' + S.wave.n + ' de ' + P.goal;
+      const left = S.queue.reduce((s, q) => s + (q.group || 1), 0) + aliens.filter((a) => !a.guard).length;
+      $('#timer').textContent = left + (left === 1 ? ' alienígena' : ' alienígenas');
+    }
+    const hz = hazardText(); $('#hazardTxt').hidden = !hz; $('#hazardTxt').textContent = hz;
+    $('#nightBtn').hidden = S.phase !== 'day';
+    $('#buildBtn').disabled = S.phase !== 'day';
+    const sq = $('#squadBtn'); sq.hidden = !troops.length && !fallen.length;
+    if (sq.hidden && S.squad === 'hold') { S.squad = 'follow'; holdFlag.visible = false; }
+    sq.textContent = 'Escuadrón: ' + (S.squad === 'follow' ? 'te sigue' : 'defiende aquí');
+    const next = PLANETS[PIDX + 1];
+    const ready = W.done[P.id] && next && !W.done[next.id] && W.cur === P.id;
+    $('#shipBtn').classList.toggle('ready', !!ready);
+    $('#shipBtn').textContent = ready ? 'Nave: ¡viaja a ' + next.name + '!' : 'Nave';
+  }
+
+  // ======================= shop & placement =======================
+  function openShop() {
+    if (!S || S.phase !== 'day') { toast('Solo puedes construir de día'); return; }
+    renderShop(); $('#shop').hidden = false;
+  }
+  function renderShop() {
+    const grid = $('#shopGrid'); grid.innerHTML = '';
+    for (const t of ORDER) {
+      const d = DEF[t], lim = limit(t), n = count(t), locked = G.coreLv < d.lock, cost = costOf(t);
+      const btn = el('button', 'item' + (d.special ? ' special' : '')); btn.type = 'button';
+      const sw = el('span', 'sw'); sw.style.background = d.sw;
+      const meta = el('span', 'meta');
+      meta.append(costNode(cost, 0), locked ? el('span', 'lock', 'Núcleo nivel ' + d.lock) : el('span', null, n + ' / ' + lim));
+      const name = el('strong', null, d.name);
+      btn.append(sw, name);
+      if (d.special) { const tg = el('span', 'tag', 'Exclusivo de ' + P.name); btn.append(tg); }
+      btn.append(el('span', 'd', d.desc), meta);
+      btn.disabled = locked || n >= lim || G.scrap < cost;
+      btn.setAttribute('aria-label', d.name + ', cuesta ' + cost + ' de chatarra' + (locked ? ', bloqueado' : ''));
+      btn.addEventListener('click', () => startPlacing(t));
+      grid.append(btn);
+    }
+  }
+  const ghost = new THREE.Group();
+  const ghostMat = new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: 0.45 });
+  const ghostBody = new THREE.Mesh(Cyl(1, 1, 1.2, 10), ghostMat); ghostBody.position.y = 0.6; ghost.add(ghostBody);
+  const ghostRing = flat(new THREE.RingGeometry(0.985, 1, 72), basic(0x6fe3ff, 0.35), 0, 0.06, 0); ghost.add(ghostRing);
+  ghost.visible = false; scene.add(ghost);
+  const selRing = flat(new THREE.RingGeometry(1, 1.12, 48), basic(0x6fe3ff, 0.9), 0, 0.09, 0); selRing.visible = false; scene.add(selRing);
+  function startPlacing(t) {
+    $('#shop').hidden = true; S.placing = t;
+    const d = DEF[t];
+    ghostBody.scale.set(d.r, 1, d.r); const rr = d.range || d.aura; ghostRing.visible = !!rr; if (rr) ghostRing.scale.setScalar(rr);
+    ghost.visible = false;
+    $('#placeTxt').textContent = 'Colocando: ' + d.name + ' · ' + (isTouch ? 'toca el suelo' : 'haz clic en el suelo');
+    $('#placeBar').hidden = false; $('#controls').hidden = true; updateHint();
+  }
+  function stopPlacing() { if (!S) return; S.placing = null; ghost.visible = false; $('#placeBar').hidden = true; $('#controls').hidden = false; updateHint(); }
+  const snap = (v) => Math.round(v / GRID) * GRID;
+  function placeProblem(t, x, z) {
+    const d = DEF[t];
+    if (Math.hypot(x, z) > COLONY - 1.5) return 'Fuera de la colonia: construye dentro del círculo';
+    if (Math.hypot(x, z) < CORE_T.r + d.r + 0.8) return 'Demasiado cerca del núcleo';
+    if (buildings.some((b) => dist2(b.x, b.z, x, z) < b.r + d.r - 0.2)) return 'Ya hay algo construido ahí';
+    if (count(t) >= limit(t)) return 'Límite alcanzado: mejora el núcleo para construir más';
+    if (G.scrap < costOf(t)) return 'Necesitas ' + costOf(t) + ' de chatarra';
+    return null;
+  }
+  function tryPlace(p) {
+    const t = S.placing, x = snap(p.x), z = snap(p.z), err = placeProblem(t, x, z);
+    if (err) { toast(err); return; }
+    G.scrap -= costOf(t); addBuilding(t, x, z, 1, 0);
+    burst(V(x, 0.6, z), 0x6fe3ff, 12); sfx('build');
+    persist();
+    if (count(t) >= limit(t) || G.scrap < costOf(t)) stopPlacing();
+  }
+
+  // ======================= core panel =======================
+  function addRow(box, a, b) { const r = el('div', 'row'); r.append(el('span', null, a), el('span', null, b)); box.append(r); }
+  function openCore() {
+    const lv = G.coreLv, cur = CORE[lv - 1], next = CORE[lv];
+    $('#cpTitle').textContent = 'Núcleo · nivel ' + lv;
+    const rows = $('#cpRows'); rows.innerHTML = '';
+    addRow(rows, 'Vida del núcleo', cur.hp + (next ? '  →  ' + next.hp : ''));
+    addRow(rows, 'Noches en ' + P.name, Math.min(G.nights, P.goal) + ' / ' + P.goal + (W.done[P.id] ? ' ✓' : ''));
+    const up = $('#cpUpgrade');
+    if (next) {
+      const unlocks = ORDER.filter((t) => DEF[t].lock === lv + 1).map((t) => DEF[t].name);
+      const more = ORDER.filter((t) => LIMITS[t][lv] > LIMITS[t][lv - 1] && DEF[t].lock <= lv).map((t) => DEF[t].name.toLowerCase());
+      $('#cpNext').textContent = 'Nivel ' + (lv + 1) + ': ' + (unlocks.length ? 'desbloquea ' + unlocks.join(', ') + '. ' : '') + (more.length ? 'Permite más ' + more.join(', ') + '. ' : '') + 'Los edificios pueden subir a nivel ' + Math.min(3, lv + 1) + '.';
+      up.hidden = false; up.innerHTML = ''; up.append(document.createTextNode('Mejorar · '), costNode(cur.s, cur.c));
+      up.disabled = G.scrap < cur.s || G.crys < cur.c || S.phase !== 'day';
+    } else { $('#cpNext').textContent = 'Nivel máximo.'; up.hidden = true; }
+    selRing.visible = true; selRing.position.set(0, 0.09, 0); selRing.scale.setScalar(4);
+    $('#corePanel').hidden = false;
+  }
+  function upgradeCore() {
+    const cur = CORE[G.coreLv - 1];
+    if (!CORE[G.coreLv] || G.scrap < cur.s || G.crys < cur.c) return;
+    G.scrap -= cur.s; G.crys -= cur.c; G.coreLv++;
+    buildCore(G.coreLv); S.coreHp = coreMax();
+    burst(V(0, 4, 0), 0x7dffb0, 30); sfx('up');
+    persist(); openCore(); banner('NÚCLEO NIVEL ' + G.coreLv, 'Nuevos edificios y mejoras disponibles');
+  }
+
+  // ======================= building panel =======================
+  let selected = null;
+  function upgradeCost(b) { return { s: Math.round(b.d.cost * LV_COST[b.lv] * costMul()), c: b.lv === 2 ? 2 : 0 }; }
+  function statsLine(b, lv) {
+    const out = [];
+    out.push('vida ' + Math.round(b.d.hp * (b.d.wall ? LV_WALL : LV_HP)[lv - 1]));
+    if (b.d.def) out.push('daño ' + dmgOf(b, lv).toFixed(1), 'alcance ' + (b.d.range + LV_RANGE[lv - 1]).toFixed(1));
+    if (b.d.aura) out.push('radio ' + (b.d.aura * LV_AURA[lv - 1]).toFixed(1));
+    if (b.t === 'mina' || b.t === 'turbina') out.push(Math.round(prodOf(b, lv) * 60) + ' de chatarra por minuto');
+    if (b.t === 'mina') out.push('almacén ' + capOf(b, lv));
+    if (b.t === 'habitat') out.push(WORKERS[lv - 1] + ' colonos');
+    if (b.t === 'cuartel') out.push(CAP[lv - 1] + ' tropas');
+    return out.join(', ');
+  }
+  function openBuilding(b) {
+    selected = b;
+    $('#bpEyebrow').textContent = b.dead ? 'Destruido · se reconstruye al amanecer' : (b.d.special ? 'Exclusivo de ' + P.name : 'Edificio');
+    $('#bpTitle').textContent = b.d.name + ' · nivel ' + b.lv;
+    $('#bpDesc').textContent = b.d.desc;
+    const rows = $('#bpRows'); rows.innerHTML = '';
+    addRow(rows, 'Vida', Math.ceil(Math.max(0, b.hp)) + ' / ' + b.max);
+    if (b.d.def) { addRow(rows, 'Daño por disparo', dmgOf(b).toFixed(1)); addRow(rows, 'Alcance', rangeOf(b).toFixed(1)); }
+    if (b.d.aura) addRow(rows, 'Radio', auraOf(b).toFixed(1));
+    if (P.hazard === 'cold' && b.d.range) addRow(rows, 'Estado', heated(b) ? 'Caliente' : 'Congelada: dispara más despacio');
+    if (b.t === 'mina') { addRow(rows, 'Producción', Math.round(prodOf(b) * 60) + ' por minuto'); addRow(rows, 'Almacén', Math.floor(b.store) + ' / ' + capOf(b)); }
+    if (b.t === 'turbina') addRow(rows, 'Producción', Math.round(prodOf(b) * 60) + ' por minuto de huracán');
+    if (b.t === 'habitat') addRow(rows, 'Colonos', String(WORKERS[b.lv - 1]));
+    const train = $('#bpTrain'); train.innerHTML = ''; train.hidden = b.t !== 'cuartel';
+    if (b.t === 'cuartel') {
+      const h = el('h4', null, 'Entrenar tropas'); h.append(el('span', null, (troops.length + fallen.length) + ' / ' + troopCap())); train.append(h);
+      const grid = el('div', 'train-grid');
+      for (const [type, td] of Object.entries(TROOP)) {
+        const btn = el('button', 'item'); btn.type = 'button';
+        const sw = el('span', 'sw'); sw.style.background = '#' + td.accent.toString(16).padStart(6, '0');
+        const meta = el('span', 'meta'); meta.append(costNode(td.cost, 0), el('span', null, String(troops.concat(fallen).filter((t) => t.type === type).length)));
+        btn.append(sw, el('strong', null, td.name), el('span', 'd', td.desc), meta);
+        btn.disabled = b.dead || troops.length + fallen.length >= troopCap() || G.scrap < td.cost;
+        btn.addEventListener('click', () => { trainTroop(type); openBuilding(b); });
+        grid.append(btn);
+      }
+      train.append(grid);
+      if (troops.length + fallen.length >= troopCap()) train.append(el('p', 'muted', 'Cuartel lleno. Mejóralo para tener más tropas.'));
+    }
+    const up = $('#bpUpgrade');
+    if (b.lv >= 3) { $('#bpNext').textContent = 'Nivel máximo.'; up.hidden = true; }
+    else {
+      const c = upgradeCost(b), needCore = b.lv + 1;
+      up.hidden = false; up.innerHTML = ''; up.append(document.createTextNode('Mejorar a nivel ' + (b.lv + 1) + ' · '), costNode(c.s, c.c));
+      let why = '';
+      if (G.coreLv < needCore) why = 'Necesitas el núcleo a nivel ' + needCore + '.';
+      else if (S.phase !== 'day') why = 'Solo se puede mejorar de día.';
+      else if (b.dead) why = 'Espera a que se reconstruya.';
+      $('#bpNext').textContent = 'Nivel ' + (b.lv + 1) + ': ' + statsLine(b, b.lv + 1) + '. ' + why;
+      up.disabled = !!why || G.scrap < c.s || G.crys < c.c;
+    }
+    selRing.visible = true; selRing.position.set(b.x, 0.09, b.z); selRing.scale.setScalar(b.r + 0.4);
+    $('#bPanel').hidden = false;
+  }
+  function upgradeBuilding() {
+    const b = selected; if (!b || b.lv >= 3) return;
+    const c = upgradeCost(b);
+    if (G.coreLv < b.lv + 1 || G.scrap < c.s || G.crys < c.c || S.phase !== 'day' || b.dead) return;
+    G.scrap -= c.s; G.crys -= c.c; b.lv++; applyLevel(b); b.hp = b.max;
+    if (b.t === 'habitat') syncWorkers(b);
+    burst(V(b.x, 1.5, b.z), lvColor[b.lv - 1], 20); sfx('up');
+    persist(); openBuilding(b);
+    toast(b.d.name + ' mejorado a nivel ' + b.lv, 'good');
+  }
+
+  // ======================= ship: system map & lab =======================
+  function openMap() {
+    $('#mpEyebrow').textContent = 'Nave colonial · Universo ' + U;
+    const list = $('#mpList'); list.innerHTML = '';
+    PLANETS.forEach((pl, i) => {
+      const unlocked = W.unlocked.includes(pl.id), here = pl.id === P.id, done = !!W.done[pl.id];
+      const row = el('div', 'planet' + (here ? ' here' : '') + (unlocked ? '' : ' locked'));
+      const ball = el('span', 'ball'); ball.style.background = pl.ball;
+      const info = el('div', 'info');
+      const col = W.colonies[pl.id];
+      const st = here ? 'Estás aquí' : done ? 'Conquistado' : unlocked ? (col ? 'Colonia fundada' : 'Disponible') : 'Bloqueado';
+      info.append(el('span', 'st' + (done ? ' ok' : ''), st + (col ? ' · ' + Math.min(col.nights, pl.goal) + ' / ' + pl.goal + ' noches' : '')), el('strong', null, (i + 1) + '. ' + pl.name), el('span', 'd', unlocked ? pl.twist : pl.desc));
+      row.append(ball, info);
+      if (unlocked && !here) { const b = el('button', 'primary', col ? 'Volver' : 'Viajar'); b.type = 'button'; b.addEventListener('click', () => travel(pl.id)); row.append(b); }
+      else row.append(el('span'));
+      list.append(row);
+    });
+    const uni = $('#mpUniverse'); uni.innerHTML = '';
+    if (PLANETS.every((pl) => W.done[pl.id])) {
+      const b = el('button', 'primary', 'Saltar al universo ' + (U + 1)); b.type = 'button';
+      uni.append(el('p', 'muted', 'Has conquistado todo el sistema. En el siguiente universo los alienígenas son más fuertes y el botín más grande. Conservas los cristales y el laboratorio.'), b);
+      b.addEventListener('click', jumpUniverse);
+    }
+    $('#mpCrys').textContent = G.crys;
+    const lab = $('#labList'); lab.innerHTML = '';
+    for (const [k, L] of Object.entries(LAB)) {
+      const lv = labLv(k), row = el('div', 'lab'), info = el('div');
+      const nm = el('strong', null, L.name); const pips = el('span', 'pips'); for (let i = 0; i < LAB_MAX; i++) pips.append(el('i', i < lv ? 'on' : ''));
+      nm.append(pips); info.append(nm, el('span', 'd', L.desc));
+      const b = el('button', null); b.type = 'button';
+      if (lv >= LAB_MAX) { b.textContent = 'Completo'; b.disabled = true; }
+      else { b.append(costNode(0, labCost(lv))); b.disabled = G.crys < labCost(lv); b.addEventListener('click', () => buyLab(k)); }
+      row.append(info, b); lab.append(row);
+    }
+    $('#mapPanel').hidden = false;
+  }
+  function buyLab(k) {
+    const lv = labLv(k), c = labCost(lv);
+    if (lv >= LAB_MAX || G.crys < c) return;
+    G.crys -= c; W.lab[k] = lv + 1; sfx('up');
+    if (k === 'vida') { CMD.max = 100 + 20 * W.lab.vida; CMD.hp = CMD.max; }
+    if (k === 'tropas') troops.concat(fallen).forEach((u) => { const m = Math.round(u.td.hp * (1 + 0.2 * W.lab.tropas)); u.hp += m - u.max; u.max = m; });
+    persist(); openMap(); toast(LAB[k].name + ' mejorado', 'good');
+  }
+  function travel(id) {
+    persist(); W.cur = id;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(W)); } catch (e) {}
+    banner('VIAJANDO…', PLANETS.find((p) => p.id === id).name);
+    setTimeout(() => location.reload(), 600);
+    setTimeout(() => toast('Si no cambia de planeta, recarga la página', 'new'), 3500);
+  }
+  function jumpUniverse() {
+    persist(); W.universe = U + 1; W.done = {}; W.unlocked = ['marte']; W.colonies = {}; W.cur = 'marte'; W.news = 4;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(W)); } catch (e) {}
+    banner('SALTO CUÁNTICO…', 'Universo ' + (U + 1));
+    setTimeout(() => location.reload(), 800);
+  }
+
+  // ======================= reports =======================
+  const reportQueue = [];
+  let reportAction = null;
+  function showReport(eyebrow, title, items, action) {
+    if (!$('#reportPanel').hidden) { reportQueue.push([eyebrow, title, items, action]); return; }
+    $('#rpEyebrow').textContent = eyebrow; $('#rpTitle').textContent = title;
+    const ul = $('#rpList'); ul.innerHTML = '';
+    items.forEach(([cls, text]) => ul.append(el('li', cls, text)));
+    reportAction = action || null;
+    $('#rpAction').hidden = !action; if (action) $('#rpAction').textContent = action.label;
+    $('#reportPanel').hidden = false; $('#rpClose').focus();
+  }
+  function closeReport() { $('#reportPanel').hidden = true; if (reportQueue.length) showReport(...reportQueue.shift()); }
+  function simulateAway(sec) {
+    const items = [];
+    let prod = 0;
+    for (const b of buildings) if (b.t === 'mina') { const add = Math.min(capOf(b) - b.store, prodOf(b) * sec); if (add > 0) { b.store += add; prod += add; } }
+    if (prod >= 1) items.push(['gold', 'Tus minas han producido ' + Math.floor(prod) + ' de chatarra.']);
+    const attacks = Math.min(3, Math.floor(sec / OFFLINE_EVERY));
+    for (let i = 0; i < attacks; i++) {
+      const n = G.nights + 1;
+      const def = defenseScore() + G.coreLv * 1.5, threat = (2 + n * 1.2) * (1 + 0.1 * PIDX);
+      const p = clamp(def / threat * 0.75, 0.1, 0.92);
+      if (Math.random() < p) { const r = 15 + n * 4; G.scrap += r; G.nights++; items.push(['good', 'Ataque ' + (i + 1) + ': tus defensas lo rechazaron. +' + r + ' de chatarra.']); }
+      else { const lost = Math.floor(G.scrap * 0.25); G.scrap -= lost; items.push(['bad', 'Ataque ' + (i + 1) + ': la colonia cayó. Perdiste ' + lost + ' de chatarra. Mejora tus defensas.']); }
+    }
+    if (!attacks) items.push(['', 'No ha habido ataques. Los alienígenas atacan cada ' + OFFLINE_EVERY / 60 + ' minutos mientras no juegas.']);
+    if (refreshPois()) items.push(['new', 'Fuera de la colonia han vuelto a aparecer cristales, nidos o restos de naves.']);
+    persist();
+    showReport('Informe de ' + P.name, 'Mientras no estabas (' + fmtDur(sec) + ')', items);
+    checkPlanet();
+  }
+  function checkPlanet() {
+    if (G.nights >= P.goal && !W.done[P.id]) {
+      W.done[P.id] = true;
+      const next = PLANETS[PIDX + 1], reward = 5 * U;
+      G.crys += reward;
+      if (next && !W.unlocked.includes(next.id)) W.unlocked.push(next.id);
+      persist(); sfx('up');
+      const items = [['good', 'Has superado ' + P.goal + ' noches en ' + P.name + '. +' + reward + ' cristales de recompensa.']];
+      if (next) items.push(['new', 'Ya puedes viajar a ' + next.name + ': ' + next.twist], ['', 'Tu colonia de ' + P.name + ' se queda guardada. Puedes volver cuando quieras.']);
+      else items.push(['new', 'Has conquistado todo el sistema solar. Desde la nave puedes saltar a otro universo.']);
+      showReport('¡Planeta conquistado!', P.name + ' es tuyo', items, { label: 'Abrir la nave', fn: openMap });
+    }
+  }
+
+  // ======================= rifts =======================
+  const riftMat = new THREE.MeshBasicMaterial({ color: 0xc04bff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+  const riftRingMat = basic(0xc04bff, 0.7);
+  function makeRifts() {
+    const n = G.nights + 1 >= 3 ? 3 : 2, base = Math.random() * TAU, spread = P.hazard === 'wind' ? 0.45 : TAU / n;
+    for (let i = 0; i < n; i++) {
+      const a = base + i * spread + (Math.random() - 0.5) * (P.hazard === 'wind' ? 0.2 : 0.8), x = Math.cos(a) * RIFT_R, z = Math.sin(a) * RIFT_R;
+      const g = new THREE.Group();
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 18, 16, 1, true), riftMat); col.position.y = 9; g.add(col);
+      const ring = flat(new THREE.RingGeometry(1.6, 2.1, 32), riftRingMat, 0, 0.1, 0); g.add(ring);
+      g.position.set(x, 0, z); scene.add(g);
+      S.rifts.push({ g, x, z, ring });
+    }
+    updateHint();
+  }
+  function clearRifts() { S.rifts.forEach((r) => scene.remove(r.g)); S.rifts.length = 0; }
+
+  // ======================= meteors & lightning =======================
+  const meteorMat = new THREE.MeshStandardMaterial({ color: 0x5a3a2a, emissive: 0xff6a1a, emissiveIntensity: 1, flatShading: true });
+  const shardMat = glow(0x6fe3ff, 1.1);
+  function startMeteors() {
+    S.meteorDone = true;
+    banner('¡LLUVIA DE METEORITOS!', 'Aléjate de los círculos rojos · dejan cristales');
+    S.shake = 0.3;
+    const n = 6 + Math.min(8, G.nights);
+    for (let i = 0; i < n; i++) S.meteorQueue.push(i * 0.7 + Math.random() * 0.4);
+  }
+  function strikePoint() {
+    const live = buildings.filter((b) => !b.dead);
+    if (live.length && Math.random() < 0.6) { const b = live[Math.floor(Math.random() * live.length)]; return [b.x + (Math.random() - 0.5) * 2, b.z + (Math.random() - 0.5) * 2]; }
+    const a = Math.random() * TAU, r = 5 + Math.random() * (COLONY - 7); return [Math.cos(a) * r, Math.sin(a) * r];
+  }
+  function dropMeteor() {
+    const [x, z] = strikePoint();
+    const mark = flat(new THREE.RingGeometry(2.1, 2.4, 32), basic(0xff3b3b, 0.8), x, 0.1, z); scene.add(mark);
+    const m = mesh(new THREE.DodecahedronGeometry(0.75, 0), meteorMat, x + 10, 28, z - 7); scene.add(m);
+    meteors.push({ m, mark, x, z, t: 0, dur: 1.7, kind: 'meteor' });
+  }
+  function impact(me) {
+    burst(V(me.x, 0.5, me.z), 0xff9f5a, 18, 5); S.shake = Math.max(S.shake, 0.35); sfx('boom');
+    areaDamage(me.x, me.z, 2.4, 25, 30);
+    if (Math.random() < 0.55) { const s = mesh(new THREE.OctahedronGeometry(0.32), shardMat, me.x, 0.5, me.z); scene.add(s); shards.push({ m: s, ph: Math.random() * 6 }); }
+    scene.add(flat(new THREE.RingGeometry(0.7, 1.3, 10), M(0x5a3f2c), me.x, 0.07, me.z));
+  }
+  function startBolt() {
+    let [x, z] = strikePoint();
+    const rod = buildings.filter((b) => b.t === 'pararrayos' && !b.dead).find((b) => dist2(b.x, b.z, x, z) < auraOf(b));
+    if (rod) { x = rod.x; z = rod.z; }
+    const mark = flat(new THREE.RingGeometry(1.7, 2, 28), basic(rod ? 0xffe14f : 0xffffff, 0.8), x, 0.1, z); scene.add(mark);
+    meteors.push({ mark, x, z, t: 0, dur: 0.9, kind: 'bolt', rod });
+  }
+  function boltHit(me) {
+    const pos = bolt.geometry.attributes.position, top = me.rod ? 4.3 * me.rod.baseScale : 0.2;
+    for (let i = 0; i < 8; i++) { const k = i / 7; pos.setXYZ(i, me.x + (i && i < 7 ? (Math.random() - 0.5) * 1.6 : 0), 40 * (1 - k) + top * k, me.z + (i && i < 7 ? (Math.random() - 0.5) * 1.6 : 0)); }
+    pos.needsUpdate = true; bolt.visible = true; S.boltVis = 0.15; flashT = 0.12; sfx('zap');
+    if (me.rod) { gain(15 * (1 + 0.3 * (U - 1)), me.x, 5, me.z, true); burst(V(me.x, 4.3, me.z), 0xffe14f, 12); }
+    else { burst(V(me.x, 0.4, me.z), 0xffffff, 14, 5); areaDamage(me.x, me.z, 2, 30, 25); S.shake = Math.max(S.shake, 0.3); }
+  }
+
+  // ======================= phases =======================
+  function spawnScraps(n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, r = 6 + Math.random() * (WORLD - 9);
+      const m = mesh(new THREE.DodecahedronGeometry(0.36, 0), M(0xf2b84b, 0x7a4a00, 0.6), Math.cos(a) * r, 0.45, Math.sin(a) * r);
+      scene.add(m); scraps.push({ m, ph: Math.random() * 6 });
+    }
+  }
+  function startDay() {
+    S.phase = 'day'; S.t = DAY_LEN; mixTarget = 0; S.meteorDone = false; S.meteorQueue = []; S.mclock = 0; S.dust = false; fogMul = 1;
+    S.meteorAt = G.nights >= 1 && (P.hazard === 'dust' || P.hazard === 'heat' || Math.random() < 0.5) && Math.random() < 0.4 ? DAY_LEN * (0.35 + Math.random() * 0.35) : -1;
+    S.rainAt = P.hazard === 'acid' ? DAY_LEN * (0.55 + Math.random() * 0.3) : -1; S.rain = false; S.rainLeft = 0;
+    spawnScraps(3); updateHint();
+  }
+  function pickType(n) {
+    const w = P.pool.filter((x) => n >= x[1]);
+    let tot = 0; w.forEach((x) => { tot += x[2]; });
+    let r = Math.random() * tot;
+    for (const [t, , k] of w) { r -= k; if (r <= 0) return t; }
+    return w[0][0];
+  }
+  function startNight() {
+    if (S.placing) stopPlacing();
+    $('#shop').hidden = true; $('#corePanel').hidden = true; $('#bPanel').hidden = true; selRing.visible = false;
+    if (!S.rifts.length) makeRifts();
+    const n = G.nights + 1;
+    let total = Math.round(6 + n * 2.4 + defenseScore() * 0.5 + Math.floor(PIDX / 2));
+    if (G.nestKilled) total = Math.round(total * 0.75);
+    G.nestKilled = false;
+    const q = [];
+    for (let i = 0; i < total; i++) {
+      const r = S.rifts[i % S.rifts.length], type = pickType(n), pack = ALIEN[type].pack || 1;
+      q.push({ type, x: r.x + (Math.random() - 0.5) * 3, z: r.z + (Math.random() - 0.5) * 3, group: pack });
+      if (pack > 1) i += pack - 1;
+    }
+    if (G.pois.nest.alive) for (let i = 0; i < 4; i++) q.push({ type: pickType(n), x: NEST.x + (Math.random() - 0.5) * 3, z: NEST.z + (Math.random() - 0.5) * 3, group: 1 });
+    for (let i = q.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = q[i]; q[i] = q[j]; q[j] = tmp; }
+    const boss = n % 5 === 0;
+    if (boss) { const r = S.rifts[0]; q.unshift({ type: 'jefe', x: r.x, z: r.z, group: 1 }); }
+    S.queue = q; S.wave = { n }; S.spawnT = 0.6; S.spawnEvery = SPAWN_WINDOW / q.length; S.phase = 'night'; mixTarget = 1;
+    aliens.forEach((a) => { a.guard = null; });
+    S.rain = false; wx.visible = false;
+    if (P.hazard === 'dust' && n >= 2 && Math.random() < 0.4) { S.dust = true; fogMul = 0.6; }
+    banner('NOCHE ' + n, boss ? '¡Viene ' + ALIEN.jefe.name.toLowerCase() + '!' : S.dust ? 'Tormenta de polvo: tus defensas ven menos' : 'Protege el núcleo hasta el amanecer');
+    if (boss) S.shake = 0.5;
+    sfx('night'); updateHint();
+  }
+  function clearHostiles() {
+    aliens.slice().forEach((a) => { burst(a.g.position.clone().setY(0.8), a.d.col, 4); removeAlien(a); });
+    [bullets, acids, shells].forEach((arr) => { arr.forEach((b) => scene.remove(b.m)); arr.length = 0; });
+    fires.forEach((f) => scene.remove(f.m)); fires.length = 0;
+  }
+  function dawn(win) {
+    clearHostiles(); clearRifts(); restoreAll(); S.coreHp = coreMax();
+    if (CMD.dead) respawnCmd();
+    const bk = barracks();
+    fallen.splice(0).forEach((u) => { u.dead = false; u.hp = u.max; u.g.visible = true; u.g.position.set((bk ? bk.x : 0) + (Math.random() - 0.5) * 2, 0, (bk ? bk.z : 4) + 2.5); troops.push(u); });
+    if (win) {
+      const n = S.wave.n, rs = Math.round((25 + n * 8 + PIDX * 5) * (1 + 0.3 * (U - 1))), rc = 1 + (n % 3 === 0 ? 1 : 0);
+      G.nights++; gain(rs, 0, 6, 0, true); gainC(rc, 0, 7, 0);
+      banner('AMANECE', 'Noche ' + n + ' superada · +' + rs + ' chatarra · +' + rc + ' cristales');
+    } else {
+      const lost = Math.floor(G.scrap * 0.3); G.scrap -= lost;
+      banner('LA COLONIA HA CAÍDO', 'Pierdes ' + lost + ' de chatarra · Reconstruyendo al amanecer');
+    }
+    if (refreshPois()) setTimeout(() => toast('Han aparecido cosas nuevas fuera de la colonia', 'new'), 2800);
+    persist(); startDay(); checkPlanet();
+  }
+  function respawnCmd() {
+    CMD.dead = false; CMD.hp = CMD.max; CMD.g.rotation.x = 0; CMD.g.position.set(0, 0, 4.6); CMD.vel.set(0, 0, 0);
+    burst(V(0, 1, 4.6), 0x7dffb0, 14); updateHint();
+  }
+
+  // ======================= input =======================
+  const keys = new Set();
+  window.addEventListener('keydown', (e) => {
+    if (!started || !S) return;
+    const k = e.key.toLowerCase();
+    if (k === 'escape') { if (S.placing) stopPlacing(); ['#shop', '#corePanel', '#bPanel', '#menuPanel', '#mapPanel'].forEach((s) => { $(s).hidden = true; }); selRing.visible = false; return; }
+    if (anyPanelOpen()) return;
+    keys.add(k);
+    if (k === 'b') { if ($('#shop').hidden) openShop(); else $('#shop').hidden = true; }
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  window.addEventListener('blur', () => keys.clear());
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floor = new THREE.Plane(V(0, 1, 0), 0);
+  function setRay(x, y) { ndc.set((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera); }
+  function groundPoint(x, y) { setRay(x, y); const out = V(0, 0, 0); return ray.ray.intersectPlane(floor, out) ? out : null; }
+  function pickAt(x, y) {
+    setRay(x, y);
+    const list = buildings.filter((b) => !b.dead).map((b) => b.g); list.push(coreG);
+    const hits = ray.intersectObjects(list, true);
+    for (const h of hits) { let o = h.object; while (o) { if (o.userData.b) return o.userData.b; if (o.userData.core) return 'core'; o = o.parent; } }
+    const p = groundPoint(x, y);
+    if (p) { const b = buildings.find((bb) => dist2(bb.x, bb.z, p.x, p.z) < bb.r + 0.3); if (b) return b; if (Math.hypot(p.x, p.z) < CORE_T.r) return 'core'; }
+    return null;
+  }
+  let joy = null, down = null;
+  const stick = $('#stick'), knob = $('#knob');
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!started || !S || anyPanelOpen()) return;
+    if (!$('#shop').hidden) { $('#shop').hidden = true; return; }
+    if (S.placing) { const p = groundPoint(e.clientX, e.clientY); if (p) tryPlace(p); return; }
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+    joy = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px'; knob.style.transform = '';
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (S && S.placing && !isTouch) {
+      const p = groundPoint(e.clientX, e.clientY);
+      if (p) { const x = snap(p.x), z = snap(p.z); ghost.position.set(x, 0, z); ghost.visible = true; ghostMat.color.set(placeProblem(S.placing, x, z) ? 0xff6b5e : 0x7dffb0); }
+    }
+    if (joy && e.pointerId === joy.id) {
+      let dx = (e.clientX - joy.x) / 50, dy = (e.clientY - joy.y) / 50; const l = Math.hypot(dx, dy);
+      if (l > 0.2) stick.hidden = false;
+      if (l > 1) { dx /= l; dy /= l; }
+      joy.dx = dx; joy.dy = dy; knob.style.transform = 'translate(' + dx * 34 + 'px,' + dy * 34 + 'px)';
+    }
+  });
+  const endPointer = (e) => {
+    if (down && e.pointerId === down.id) {
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
+      if (moved < 10 && dt < 400 && e.type === 'pointerup') {
+        const hit = pickAt(e.clientX, e.clientY);
+        if (hit === 'core') openCore(); else if (hit) openBuilding(hit);
+      }
+      down = null;
+    }
+    if (joy && e.pointerId === joy.id) { joy = null; stick.hidden = true; }
+  };
+  canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
+
+  function closeSel() { selRing.visible = false; selected = null; }
+  $('#buildBtn').addEventListener('click', openShop);
+  $('#shopClose').addEventListener('click', () => { $('#shop').hidden = true; });
+  $('#placeDone').addEventListener('click', stopPlacing);
+  $('#coreBtn').addEventListener('click', openCore);
+  $('#shipBtn').addEventListener('click', openMap);
+  $('#mpClose').addEventListener('click', () => { $('#mapPanel').hidden = true; });
+  $('#cpClose').addEventListener('click', () => { $('#corePanel').hidden = true; closeSel(); });
+  $('#cpUpgrade').addEventListener('click', upgradeCore);
+  $('#bpClose').addEventListener('click', () => { $('#bPanel').hidden = true; closeSel(); });
+  $('#bpUpgrade').addEventListener('click', upgradeBuilding);
+  $('#nightBtn').addEventListener('click', () => { if (S && S.phase === 'day') startNight(); });
+  $('#squadBtn').addEventListener('click', () => {
+    if (S.squad === 'follow') { S.squad = 'hold'; S.hold = { x: player.position.x, z: player.position.z }; holdFlag.position.set(S.hold.x, 0, S.hold.z); holdFlag.visible = true; toast('Tus tropas defienden esta zona', 'good'); }
+    else { S.squad = 'follow'; holdFlag.visible = false; toast('Tus tropas te siguen', 'good'); }
+  });
+  $('#rpClose').addEventListener('click', closeReport);
+  $('#rpAction').addEventListener('click', () => { const a = reportAction; closeReport(); if (a) a.fn(); });
+  $('#menuBtn').addEventListener('click', () => { $('#resetConfirm').hidden = true; $('#resetBox').hidden = false; $('#menuPanel').hidden = false; });
+  $('#menuClose').addEventListener('click', () => { $('#menuPanel').hidden = true; });
+  const muteLabel = () => { $('#muteBtn').textContent = 'Sonido: ' + (W.muted ? 'desactivado' : 'activado'); };
+  $('#muteBtn').addEventListener('click', () => { W.muted = !W.muted; muteLabel(); persist(); });
+  muteLabel();
+  $('#simBtn').addEventListener('click', () => { $('#menuPanel').hidden = true; if (S.phase === 'night') dawn(true); simulateAway(2 * 3600); });
+  $('#resetBtn').addEventListener('click', () => { $('#resetBox').hidden = true; $('#resetConfirm').hidden = false; });
+  $('#resetNo').addEventListener('click', () => { $('#resetConfirm').hidden = true; $('#resetBox').hidden = false; });
+  $('#resetYes').addEventListener('click', () => { try { ['colonia-nova-v4', 'colonia-nova-v3', 'colonia-nova-v2'].forEach((k) => localStorage.removeItem(k)); } catch (e) {} location.reload(); });
+  if (isTouch) $('#moveHelp').textContent = 'Arrastra el dedo por la pantalla.';
+
+  // ======================= boot =======================
+  buildCore(G.coreLv);
+  S = { phase: 'day', t: DAY_LEN, coreHp: 0, wave: null, queue: [], spawnT: 0, spawnEvery: 1, placing: null, shake: 0, rifts: [], squad: 'follow', hold: null,
+    meteorAt: -1, meteorDone: false, meteorQueue: [], mclock: 0, dust: false, rain: false, rainAt: -1, rainLeft: 0, boltT: 8, boltVis: 0, gust: 0, gustT: 15, windA: 0, turbT: 0 };
+  S.coreHp = coreMax();
+  if (isNew) {
+    [[-6, 4], [6, 4], [-6, -4], [6, -4]].forEach(([x, z]) => addBuilding('muro', x, z, 1));
+    addBuilding('torreta', 0, 6, 1); addBuilding('mina', -8, 0, 1);
+    if (P.unique.length) { const u = P.unique[0]; if (DEF[u].aura) { addBuilding(u, 4, 8, 1); if (u === 'faro') addBuilding(u, -4, -8, 1); } else addBuilding(u, 8, 0, 1); }
+  } else {
+    G.buildings.forEach((b) => { if (DEF[b.t]) addBuilding(b.t, b.x, b.z, b.lv || 1, b.store); });
+    const c = barracks();
+    if (c) {
+      const cap = CAP[c.lv - 1]; let n = 0;
+      for (const type of ['soldado', 'ingeniero']) for (let i = 0; i < (G.troops[type] || 0) && n < cap; i++, n++) spawnTroop(type, c.x + (Math.random() - 0.5) * 3, c.z + 2.5);
+    }
+  }
+  const awaySec = isNew ? 0 : (Date.now() - (G.lastSeen || Date.now())) / 1000;
+  player.position.set(0, 0, 6);
+  spawnScraps(4);
+  startDay();
+  $('#ssEyebrow').textContent = 'Universo ' + U + ' · Planeta ' + (PIDX + 1) + ' de ' + PLANETS.length;
+  $('#ssTitle').textContent = P.name;
+  $('#ssDesc').textContent = P.desc + ' Supera ' + P.goal + ' noches para conquistarlo.';
+  $('#ssTwist').textContent = P.twist;
+  $('#startBtn').textContent = isNew ? 'Fundar la colonia en ' + P.name : 'Volver a la colonia';
+  $('#startBtn').addEventListener('click', () => {
+    try { const AudioCtx = window.AudioContext || window.webkitAudioContext; if (AudioCtx && !AC) AC = new AudioCtx(); } catch (e) { AC = null; }
+    $('#startScreen').hidden = true; $('#hud').hidden = false; $('#controls').hidden = false; started = true;
+    updateHint();
+    if (W.news !== 4) {
+      W.news = 4;
+      showReport('Novedades', 'Versión 4: el sistema solar', [
+        ['new', 'Ocho planetas, de Marte a Plutón. Cada uno con su peligro, su edificio exclusivo, sus alienígenas y su jefe.'],
+        ['new', 'Supera las noches de un planeta para conquistarlo y viajar al siguiente desde la Nave. Tus colonias se quedan guardadas.'],
+        ['new', 'Laboratorio: gasta cristales en mejoras permanentes que te acompañan a todos los planetas.'],
+        ['new', 'Al conquistar Plutón puedes saltar a otro universo más difícil.'],
+        ['gold', 'Ahora ves cada moneda que ganas, y el juego tiene sonido (se puede quitar en el menú).']
+      ]);
+    }
+    persist();
+    if (awaySec > 120) simulateAway(awaySec);
+    else { banner(P.name.toUpperCase(), 'Día ' + (G.nights + 1) + ' · prepara la colonia'); checkPlanet(); }
+  });
+  setInterval(() => { if (started) persist(); }, 5000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && started) persist(); });
+  window.addEventListener('pagehide', () => { if (started) persist(); });
+
+  // ======================= update helpers =======================
+  function pushOut(o, x, z, r) {
+    const dx = o.position.x - x, dz = o.position.z - z, d = Math.hypot(dx, dz);
+    if (d < r && d > 0.001) { o.position.x = x + dx / d * r; o.position.z = z + dz / d * r; return true; }
+    return false;
+  }
+  function collideStatic(o, rad) {
+    pushOut(o, 0, 0, CORE_T.r + rad);
+    for (const b of buildings) if (!b.dead) pushOut(o, b.x, b.z, b.r + rad);
+    const r = Math.hypot(o.position.x, o.position.z);
+    if (r > WORLD - 0.8) { o.position.x *= (WORLD - 0.8) / r; o.position.z *= (WORLD - 0.8) / r; }
+  }
+  function moveTo(o, gx, gz, speed, dt, stopAt) {
+    const dx = gx - o.position.x, dz = gz - o.position.z, d = Math.hypot(dx, dz);
+    if (d <= (stopAt || 0.25)) return false;
+    const st = Math.min(d, speed * dt); o.position.x += dx / d * st; o.position.z += dz / d * st;
+    return true;
+  }
+  function updateAmbient(dt, time) {
+    if (coreGem) { coreGem.rotation.y += dt; coreGem.position.y = coreGem.userData.baseY + Math.sin(time * 2) * 0.15; }
+    coreRings.forEach((r, i) => { r.rotation.z += dt * (0.6 + i * 0.25) * (i % 2 ? -1 : 1); });
+    if (coreBeacon) coreBeacon.visible = Math.sin(time * 4) > -0.3;
+    if (coreHitT > 0) { coreHitT -= dt; coreG.scale.setScalar(1 + Math.max(0, coreHitT) * 0.25); } else coreG.scale.setScalar(1);
+    for (const s of scraps) { s.m.rotation.y += dt * 1.5; s.m.position.y = 0.45 + Math.sin(time * 3 + s.ph) * 0.08; }
+    for (const s of shards) { s.m.rotation.y += dt * 2; s.m.position.y = 0.55 + Math.sin(time * 3 + s.ph) * 0.12; }
+    for (const b of buildings) {
+      if (b.t === 'mina') {
+        if (!b.dead) b.drill.rotation.y += dt * 6;
+        b.pile.scale.setScalar(0.4 + (b.store / capOf(b)) * 1.1);
+        b.icon.visible = b.store >= 10 && !b.dead; b.icon.position.y = 2.7 + Math.sin(time * 3 + b.x) * 0.15; b.icon.rotation.y += dt * 2;
+      }
+      if (b.hub) b.hub.rotation.z += dt * (S && S.gust > 0 ? 9 : 1.2);
+      if (b.flag) b.flag.rotation.y = Math.sin(time * 3 + b.x) * 0.25;
+      if (b.ring) b.ring.rotation.z += dt * 2;
+      if (b.tip) b.tip.scale.setScalar(1 + Math.sin(time * 5 + b.x) * 0.15);
+      if (b.auraM && b.light) b.auraM.material.opacity = 0.04 + mix * 0.12;
+      if (b.beam && b.beamT > 0) { b.beamT -= dt; if (b.beamT <= 0) b.beam.visible = false; }
+      if (b.hitT > 0) { b.hitT -= dt; const k = 1 + Math.max(0, b.hitT) * 0.5; b.g.scale.set(b.baseScale * k, b.baseScale / k, b.baseScale * k); } else if (!b.dead) b.g.scale.setScalar(b.baseScale);
+    }
+    const pulse = 0.22 + Math.sin(time * 2) * 0.08;
+    DEP.forEach((D) => { D.col.material.opacity = pulse; });
+    NEST.col.material.opacity = pulse; NEST.eye.scale.setScalar(1 + Math.sin(time * 3) * 0.12);
+    WRECK.col.material.opacity = pulse;
+    if (S) S.rifts.forEach((r, i) => { r.ring.rotation.z += dt; r.ring.scale.setScalar(1 + Math.sin(time * 4 + i) * 0.1); });
+    riftMat.opacity = 0.3 + Math.sin(time * 5) * 0.1;
+    holdRing.rotation.z += dt * 0.5;
+    for (const f of fires) f.m.material.opacity = 0.45 + Math.sin(time * 18 + f.x) * 0.2;
+  }
+  function updateWeather(dt) {
+    let mode = null;
+    if (P.hazard === 'acid' && S.rain) mode = 'rain';
+    else if (P.hazard === 'wind' && S.gust > 0) mode = 'wind';
+    else if (S.dust) mode = 'dust';
+    wx.visible = !!mode;
+    if (!mode) return;
+    wxMat.color.set(mode === 'rain' ? 0xd4ff6f : mode === 'wind' ? 0xdfe8ff : 0xe0a080);
+    const arr = wx.geometry.attributes.position.array, cx = camera.position.x, cz = camera.position.z - 14;
+    const wxD = Math.cos(S.windA), wzD = Math.sin(S.windA);
+    for (let i = 0; i < WX_N; i++) {
+      const j = i * 3;
+      if (mode === 'rain') arr[j + 1] -= 22 * dt;
+      else if (mode === 'wind') { arr[j] += wxD * 30 * dt; arr[j + 2] += wzD * 30 * dt; arr[j + 1] -= 0.5 * dt; }
+      else { arr[j] += 6 * dt; arr[j + 1] -= 1 * dt; }
+      if (arr[j + 1] < 0) arr[j + 1] += 25;
+      if (arr[j] - cx > 35) arr[j] -= 70; if (arr[j] - cx < -35) arr[j] += 70;
+      if (arr[j + 2] - cz > 35) arr[j + 2] -= 70; if (arr[j + 2] - cz < -35) arr[j + 2] += 70;
+    }
+    wx.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // ======================= update =======================
+  let hudT = 0;
+  function update(dt, time) {
+    updateAmbient(dt, time);
+    mix += (mixTarget - mix) * Math.min(1, dt * 1.2);
+    flashT = Math.max(0, flashT - dt);
+    applyPalette();
+    if (!started || !S || anyPanelOpen()) return;
+    hurtFlash = Math.max(0, hurtFlash - dt * 1.4);
+    $('#hurt').style.opacity = (hurtFlash * 0.8).toFixed(3);
+    updateWeather(dt);
+    if (S.boltVis > 0) { S.boltVis -= dt; if (S.boltVis <= 0) bolt.visible = false; }
+
+    for (const b of buildings) if (b.t === 'mina' && !b.dead) b.store = Math.min(capOf(b), b.store + prodOf(b) * dt);
+
+    // ---- planet hazards
+    if (P.hazard === 'lightning') { S.boltT -= dt; if (S.boltT <= 0) { startBolt(); S.boltT = (S.phase === 'night' ? 5 : 8) + Math.random() * 5; } }
+    if (P.hazard === 'wind') {
+      if (S.gust > 0) {
+        S.gust -= dt;
+        const px = Math.cos(S.windA) * 1.6 * dt, pz = Math.sin(S.windA) * 1.6 * dt;
+        if (!CMD.dead) { player.position.x += px; player.position.z += pz; }
+        troops.forEach((u) => { u.g.position.x += px; u.g.position.z += pz; });
+        aliens.forEach((a) => { if (a.type !== 'jefe') { a.g.position.x += px * 0.7; a.g.position.z += pz * 0.7; } });
+        S.turbT -= dt;
+        if (S.turbT <= 0) { S.turbT = 2; buildings.filter((b) => b.t === 'turbina' && !b.dead).forEach((b) => gain(prodOf(b) * 2, b.x, 4.5, b.z)); }
+        if (S.gust <= 0) S.gustT = 14 + Math.random() * 10;
+      } else { S.gustT -= dt; if (S.gustT <= 0) { S.gust = 9; S.windA = Math.random() * TAU; toast('¡Racha de huracán!', 'new'); } }
+    }
+    if (P.hazard === 'acid' && S.phase === 'day') {
+      if (!S.rain && S.rainAt > 0 && S.t <= S.rainAt) { S.rain = true; S.rainLeft = 22; S.rainAt = -1; banner('LLUVIA ÁCIDA', 'Desgasta los edificios que no están bajo un escudo'); }
+      if (S.rain) {
+        S.rainLeft -= dt; if (S.rainLeft <= 0) S.rain = false;
+        for (const b of buildings) if (!b.dead && b.t !== 'escudo' && !shielded(b.x, b.z) && b.hp > b.max * 0.25) { b.hp -= 1.5 * dt; if (Math.random() < dt * 2) burst(V(b.x, 1.2, b.z), 0xd4ff6f, 1, 1); }
+      }
+    }
+
+    // ---- clock
+    if (S.phase === 'day') {
+      S.t -= dt;
+      if (S.t <= 20 && !S.rifts.length) makeRifts();
+      if (S.meteorAt > 0 && !S.meteorDone && S.t <= S.meteorAt) { startMeteors(); S.mclock = 0; }
+      if (S.t <= 0) startNight();
+    } else {
+      S.spawnT -= dt;
+      if (S.queue.length && S.spawnT <= 0) {
+        const q = S.queue.shift();
+        for (let k = 0; k < (q.group || 1); k++) spawnAlien(q.type, q.x + (k ? (Math.random() - 0.5) * 2 : 0), q.z + (k ? (Math.random() - 0.5) * 2 : 0));
+        S.spawnT = S.spawnEvery;
+      }
+      if (!S.queue.length && !aliens.some((a) => !a.guard)) { dawn(true); return; }
+    }
+    if (S.meteorQueue.length) {
+      S.mclock += dt;
+      while (S.meteorQueue.length && S.meteorQueue[0] <= S.mclock) { S.meteorQueue.shift(); dropMeteor(); }
+    }
+
+    // ---- commander
+    let mx = 0, mz = 0;
+    if (CMD.dead) {
+      CMD.respawnT -= dt;
+      if (CMD.respawnT <= 0) { respawnCmd(); toast('Tu comandante ha vuelto al núcleo', 'good'); }
+    } else {
+      if (keys.has('w') || keys.has('arrowup')) mz -= 1;
+      if (keys.has('s') || keys.has('arrowdown')) mz += 1;
+      if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+      if (keys.has('d') || keys.has('arrowright')) mx += 1;
+      if (joy) { mx += joy.dx; mz += joy.dy; }
+    }
+    const ml = Math.hypot(mx, mz), moving = ml > 0.05 && !CMD.dead;
+    if (!CMD.dead) {
+      const tvx = moving ? mx / ml * Math.min(1, ml) * 7.5 : 0, tvz = moving ? mz / ml * Math.min(1, ml) * 7.5 : 0;
+      const k = P.hazard === 'ice' ? Math.min(1, dt * 2.2) : 1;
+      CMD.vel.x += (tvx - CMD.vel.x) * k; CMD.vel.z += (tvz - CMD.vel.z) * k;
+      player.position.x += CMD.vel.x * dt; player.position.z += CMD.vel.z * dt;
+      collideStatic(player, 0.45);
+      const outside = Math.hypot(player.position.x, player.position.z) > COLONY;
+      if (P.hazard === 'heat' && S.phase === 'day' && outside) { CMD.hp -= 6 * dt; hurtFlash = Math.max(hurtFlash, 0.25); if (CMD.hp <= 0) unitDown(CMD); }
+      else if (S.phase === 'day') CMD.hp = Math.min(CMD.max, CMD.hp + 5 * dt);
+    }
+    if (!CMD.dead) {
+      animateWalk(CMD, moving || Math.hypot(CMD.vel.x, CMD.vel.z) > 1, time, 11, true);
+      for (let i = scraps.length - 1; i >= 0; i--) { const s = scraps[i]; if (dist2(s.m.position.x, s.m.position.z, player.position.x, player.position.z) < 1.4) { gain(8, s.m.position.x, 1.2, s.m.position.z); burst(s.m.position, 0xf2b84b, 6); scene.remove(s.m); scraps.splice(i, 1); } }
+      for (let i = shards.length - 1; i >= 0; i--) { const s = shards[i]; if (dist2(s.m.position.x, s.m.position.z, player.position.x, player.position.z) < 1.4) { gainC(1, s.m.position.x, 1.4, s.m.position.z); burst(s.m.position, 0x6fe3ff, 8); scene.remove(s.m); shards.splice(i, 1); } }
+      for (const b of buildings) {
+        if (b.t === 'mina' && !b.dead && b.store >= 5 && dist2(b.x, b.z, player.position.x, player.position.z) < b.r + 1.6) {
+          const n = Math.floor(b.store); b.store -= n; gain(n, b.x, 3, b.z, n >= 30); burst(V(b.x, 1.5, b.z), 0xf2b84b, 8);
+        }
+      }
+      DEP.forEach((D) => {
+        if (!D.data.ready) { D.prog = 0; return; }
+        if (dist2(D.data.x, D.data.z, player.position.x, player.position.z) < 2.6) {
+          D.prog += dt / 2.5;
+          if (D.prog >= 1) {
+            D.prog = 0; D.data.ready = false; D.data.regrow = G.nights + 2; gainC(2, D.data.x, 3, D.data.z);
+            burst(V(D.data.x, 1.2, D.data.z), 0x6fe3ff, 18); refreshDeposit(D); toast('El yacimiento volverá en 2 noches', 'new'); persist();
+          }
+        } else D.prog = Math.max(0, D.prog - dt);
+      });
+      const w = G.pois.wreck;
+      if (w.ready && dist2(w.x + 1.6, w.z - 1, player.position.x, player.position.z) < 2.4) {
+        const c = Math.random() < 0.35 ? 1 : 0;
+        gain(50 + Math.floor(Math.random() * 40), w.x + 1.6, 2, w.z - 1, true); if (c) gainC(1, w.x + 1.6, 3, w.z - 1);
+        w.ready = false; w.regrow = G.nights + 2; placeWreck();
+        burst(V(w.x + 1.6, 1, w.z - 1), 0xf2b84b, 20); persist();
+      }
+    }
+    CMD.cd -= dt;
+    if (!CMD.dead) {
+      const cdmg = 1 + 0.2 * labLv('dano');
+      const pt = nearestAlien(player.position.x, player.position.z, PLAYER_RANGE);
+      if (pt) {
+        player.rotation.y = Math.atan2(pt.g.position.x - player.position.x, pt.g.position.z - player.position.z);
+        if (CMD.cd <= 0) { fire(player.position.x, 1.1, player.position.z, pt.g.position.x, pt.g.position.z, 'player', cdmg); CMD.cd = 0.3; }
+      } else if (G.pois.nest.alive && dist2(NEST.x, NEST.z, player.position.x, player.position.z) < PLAYER_RANGE + 1.6) {
+        player.rotation.y = Math.atan2(NEST.x - player.position.x, NEST.z - player.position.z);
+        if (CMD.cd <= 0) { fire(player.position.x, 1.1, player.position.z, NEST.x, NEST.z, 'player', cdmg); CMD.cd = 0.3; }
+      } else if (moving) player.rotation.y = Math.atan2(mx, mz);
+    }
+
+    // ---- nest guards (day)
+    if (G.pois.nest.alive && S.phase === 'day' && !CMD.dead) {
+      NEST.guardT -= dt;
+      const near = dist2(NEST.x, NEST.z, player.position.x, player.position.z) < 11;
+      if (near && NEST.guardT <= 0 && aliens.filter((a) => a.guard).length < 3) { spawnAlien(pickType(Math.max(1, G.nights)), NEST.x + (Math.random() - 0.5) * 2, NEST.z + (Math.random() - 0.5) * 2, NEST); NEST.guardT = 3; }
+    }
+
+    // ---- troops
+    const anchor = S.squad === 'hold' && S.hold ? S.hold : { x: player.position.x, z: player.position.z };
+    troops.slice().forEach((u, i) => {
+      const p = u.g.position; let gx = null, gz = null, armed = false;
+      u.cd -= dt;
+      let job = null;
+      if (u.type === 'ingeniero') {
+        let best = null, bd = 11;
+        for (const b of buildings) { if (b.dead || b.hp >= b.max) continue; const d = dist2(b.x, b.z, anchor.x, anchor.z); if (d < bd) { bd = d; best = b; } }
+        if (!best && S.coreHp < coreMax() && dist2(0, 0, anchor.x, anchor.z) < 11) best = CORE_T;
+        job = best;
+      }
+      const foe = nearestAlien(anchor.x, anchor.z, 9);
+      if (job) {
+        gx = job.x; gz = job.z;
+        if (dist2(job.x, job.z, p.x, p.z) < (job.r || 1) + 1.1) {
+          gx = p.x; gz = p.z;
+          if (job.isCore) S.coreHp = Math.min(coreMax(), S.coreHp + u.td.repair * 0.6 * dt); else job.hp = Math.min(job.max, job.hp + u.td.repair * dt);
+          if (Math.random() < dt * 6) burst(V(job.x + (Math.random() - 0.5), 1.2, job.z + (Math.random() - 0.5)), 0x7dffb0, 1, 2);
+          u.g.rotation.y = Math.atan2(job.x - p.x, job.z - p.z);
+        }
+      } else if (foe) {
+        const d = dist2(foe.g.position.x, foe.g.position.z, p.x, p.z);
+        armed = true; u.g.rotation.y = Math.atan2(foe.g.position.x - p.x, foe.g.position.z - p.z);
+        if (d > u.td.range) { gx = foe.g.position.x; gz = foe.g.position.z; } else { gx = p.x; gz = p.z; }
+        if (u.cd <= 0 && d < u.td.range + 0.5) { fire(p.x, 0.9, p.z, foe.g.position.x, foe.g.position.z, 'troop', u.td.dmg); u.cd = u.td.rate; }
+      }
+      if (gx === null) {
+        const n = troops.length;
+        if (S.squad === 'follow') { const ang = player.rotation.y + Math.PI + (i - (n - 1) / 2) * 0.55; const rr = 2.2 + Math.floor(i / 5) * 1.2; gx = anchor.x + Math.sin(ang) * rr; gz = anchor.z + Math.cos(ang) * rr; }
+        else { const ang = i / Math.max(1, n) * TAU; gx = anchor.x + Math.sin(ang) * 1.8; gz = anchor.z + Math.cos(ang) * 1.8; }
+      }
+      if (P.hazard === 'ice') {
+        const dx = gx - p.x, dz = gz - p.z, d = Math.hypot(dx, dz), sp = d > 0.3 ? 5.5 : 0;
+        const k = Math.min(1, dt * 2.2); u.vel.x += ((d > 0.001 ? dx / d : 0) * sp - u.vel.x) * k; u.vel.z += ((d > 0.001 ? dz / d : 0) * sp - u.vel.z) * k;
+        p.x += u.vel.x * dt; p.z += u.vel.z * dt; u.moving = Math.hypot(u.vel.x, u.vel.z) > 0.5;
+      } else u.moving = moveTo(u.g, gx, gz, 5.5, dt, 0.3);
+      if (u.moving && !armed) u.g.rotation.y = Math.atan2(gx - p.x, gz - p.z);
+      collideStatic(u.g, 0.35);
+      if (P.hazard === 'heat' && S.phase === 'day' && Math.hypot(p.x, p.z) > COLONY) damage(u, 6 * dt);
+      if (u.dead) return;
+      animateWalk(u, u.moving, time + i, 12, armed || u.type === 'soldado');
+      if (u.hp < u.max) setBar(u.bar, u.hp / u.max, p.x, 1.75, p.z); else u.bar.g.visible = false;
+    });
+
+    // ---- workers
+    for (const w of workers) {
+      const p = w.g.position, h = w.home;
+      if (S.phase === 'night') {
+        w.load = 0; w.carry.visible = false; w.state = 'idle';
+        if (moveTo(w.g, h.x, h.z, 4, dt, 0.6)) { w.g.visible = true; w.moving = true; w.g.rotation.y = Math.atan2(h.x - p.x, h.z - p.z); } else { w.g.visible = false; w.moving = false; }
+        animateWalk(w, w.moving, time + h.x, 12, false);
+        continue;
+      }
+      w.g.visible = true;
+      if (w.state === 'idle') {
+        const mines = buildings.filter((b) => b.t === 'mina' && !b.dead && b.store >= 8);
+        if (mines.length) { mines.sort((a, b) => b.store - a.store); w.mine = mines[Math.floor(Math.random() * Math.min(2, mines.length))]; w.state = 'toMine'; }
+        else {
+          w.wait -= dt;
+          if (w.wait <= 0) { const a = Math.random() * TAU, r = 2 + Math.random() * 2.5; w.tx = h.x + Math.cos(a) * r; w.tz = h.z + Math.sin(a) * r; w.wait = 2 + Math.random() * 3; }
+        }
+      }
+      let gx = w.tx, gz = w.tz, stop = 0.3;
+      if (w.state === 'toMine') {
+        if (w.mine.dead) { w.state = 'idle'; continue; }
+        gx = w.mine.x; gz = w.mine.z; stop = w.mine.r + 0.7;
+        if (dist2(gx, gz, p.x, p.z) <= stop + 0.05) { const take = Math.min(Math.floor(w.mine.store), 20); w.mine.store -= take; w.load = take; w.carry.visible = take > 0; w.state = take > 0 ? 'toCore' : 'idle'; }
+      } else if (w.state === 'toCore') {
+        gx = 0; gz = 0; stop = CORE_T.r + 0.7;
+        if (dist2(0, 0, p.x, p.z) <= stop + 0.05) { gain(w.load, p.x, 2, p.z); w.load = 0; w.carry.visible = false; burst(V(p.x, 1, p.z), 0xf2b84b, 5); w.state = 'idle'; }
+      }
+      w.moving = moveTo(w.g, gx, gz, 3.6, dt, stop);
+      if (w.moving) w.g.rotation.y = Math.atan2(gx - p.x, gz - p.z);
+      for (const b of buildings) if (!b.dead && b !== w.mine) pushOut(w.g, b.x, b.z, b.r + 0.3);
+      if (w.state !== 'toCore') pushOut(w.g, 0, 0, CORE_T.r + 0.3);
+      animateWalk(w, w.moving, time + h.x + p.z, 12, false);
+    }
+
+    // ---- lights (Plutón)
+    if (P.hazard === 'dark') {
+      const faros = buildings.filter((b) => b.t === 'faro' && !b.dead);
+      for (const a of aliens) {
+        const x = a.g.position.x, z = a.g.position.z;
+        const byFaro = faros.some((f) => dist2(f.x, f.z, x, z) < auraOf(f));
+        a.lit = mix < 0.4 || a.type === 'jefe' || byFaro || Math.hypot(x, z) < 11 || (!CMD.dead && dist2(x, z, player.position.x, player.position.z) < 6) || (a.type !== 'sombra' && buildings.some((b) => !b.dead && dist2(b.x, b.z, x, z) < b.r + 2.5));
+        a.rig.visible = a.lit;
+      }
+    }
+
+    // ---- defenses
+    for (const b of buildings) {
+      if (b.dead || !b.d.range) continue;
+      b.cd -= dt;
+      const cold = P.hazard === 'cold' && !heated(b);
+      if (b.frost) b.frost.visible = cold;
+      const a = nearestAlien(b.x, b.z, rangeOf(b), b.d.min, b.t === 'mortero');
+      if (!a) continue;
+      const ang = Math.atan2(a.g.position.x - b.x, a.g.position.z - b.z);
+      if (b.head) b.head.rotation.y = ang - b.g.rotation.y;
+      if (b.cd > 0) continue;
+      b.cd = b.d.rate * (cold ? 1.6 : 1);
+      if (b.t === 'torreta') fire(b.x, 1.1, b.z, a.g.position.x, a.g.position.z, 'turret', dmgOf(b));
+      else if (b.t === 'congelador') fire(b.x, 1.1, b.z, a.g.position.x, a.g.position.z, 'ice', dmgOf(b), true);
+      else if (b.beam) {
+        const pos = b.beam.geometry.attributes.position;
+        pos.setXYZ(0, b.x, b.tipY * b.baseScale, b.z); pos.setXYZ(1, a.g.position.x, a.d.fly ? 1.9 : a.d.r, a.g.position.z); pos.needsUpdate = true;
+        b.beam.visible = true; b.beamT = b.t === 'espejo' ? 0.25 : 0.06; hurtAlien(a, dmgOf(b));
+        if (b.t === 'espejo') { burst(a.g.position.clone().setY(0.8), 0xfff1a8, 6); sfx('zap'); }
+      } else if (b.t === 'mortero') {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), shellMat); m.position.set(b.x, 1.4, b.z); scene.add(m);
+        shells.push({ m, fx: b.x, fz: b.z, tx: a.g.position.x, tz: a.g.position.z, t: 0, dur: 0.9, dmg: dmgOf(b), area: b.d.area });
+      }
+    }
+
+    // ---- aliens
+    for (const a of aliens.slice()) {
+      if (!aliens.includes(a)) continue;
+      const p = a.g.position, d = a.d;
+      a.retarget -= dt;
+      if (a.slowT > 0) a.slowT -= dt;
+      if (a.guard) {
+        a.tgt = !CMD.dead && dist2(NEST.x, NEST.z, player.position.x, player.position.z) < 15 ? CMD : null;
+      } else if (isGone(a.tgt) || a.retarget <= 0) { a.tgt = chooseTarget(a); a.retarget = 0.7; }
+      let tx, tz, stop;
+      if (a.tgt) { const tp = tpos(a.tgt); tx = tp.x; tz = tp.z; stop = d.range ? d.range : d.area ? 0.8 : (a.tgt.r || 0.5) + d.r + 0.25; }
+      else { tx = NEST.x; tz = NEST.z; stop = 2.5; }
+      const dx = tx - p.x, dz = tz - p.z, dd = Math.hypot(dx, dz) || 0.001;
+      a.g.rotation.y = Math.atan2(dx, dz);
+      let climbing = false;
+      if (dd > stop) {
+        const step = d.spd * (a.slowT > 0 ? 0.5 : 1) * dt, px = p.x, pz = p.z;
+        p.x += dx / dd * step; p.z += dz / dd * step;
+        let blocker = null;
+        if (!d.fly && a.ghostT <= 0) {
+          for (const b of buildings) {
+            if (b.dead || b === a.tgt) continue;
+            const rr = b.r + d.r, bx = p.x - b.x, bz = p.z - b.z, bd = Math.hypot(bx, bz);
+            if (bd < rr && bd > 0.001) {
+              if (d.climb && b.d.wall) { climbing = true; continue; }
+              p.x = b.x + bx / bd * rr; p.z = b.z + bz / bd * rr; blocker = b;
+            }
+          }
+        }
+        if (a.tgt !== CORE_T && !d.area) pushOut(a.g, 0, 0, CORE_T.r + d.r);
+        if (a.ghostT > 0) a.ghostT -= dt;
+        const moved = Math.hypot(p.x - px, p.z - pz);
+        if (blocker && moved < step * 0.35) { a.blockT += dt; if (a.blockT > 0.45 && !a.guard) { a.tgt = blocker; a.retarget = 3; a.blockT = 0; } }
+        else a.blockT = Math.max(0, a.blockT - dt * 2);
+        if (moved < step * 0.15) { a.stillT += dt; if (a.stillT > 2.5) { a.ghostT = 1.5; a.stillT = 0; } } else a.stillT = 0;
+      } else if (a.tgt) {
+        a.stillT = 0;
+        a.atkT -= dt;
+        if (a.atkT <= 0) {
+          a.atkT = d.rate;
+          if (d.explode) {
+            areaDamage(p.x, p.z, 2.2, d.dmg, d.dmg * 0.8); burst(p.clone().setY(0.5), 0xffd23a, 20, 4); S.shake = Math.max(S.shake, 0.25); sfx('boom');
+            removeAlien(a); continue;
+          } else if (d.area) {
+            areaDamage(p.x, p.z, d.area, d.dmg, d.dmg * 0.6); burst(V(p.x, 0.4, p.z), d.col, 8, 1); a.lunge = 0.22;
+          } else if (d.range) {
+            const m = new THREE.Mesh(acidGeo, acidMat); m.position.set(p.x, d.r * 1.2, p.z); scene.add(m);
+            acids.push({ m, tgt: a.tgt, dmg: d.dmg, life: 3 }); a.lunge = 0.22;
+          } else {
+            damage(a.tgt, d.dmg); a.lunge = 0.22;
+            const tp = tpos(a.tgt); burst(V(tp.x + (p.x - tp.x) * 0.4, 1, tp.z + (p.z - tp.z) * 0.4), d.col, 4, 2);
+          }
+        }
+      }
+      if (d.burn) { a.burnT -= dt; if (a.burnT <= 0) { a.burnT = 0.7; const f = flat(new THREE.CircleGeometry(0.75, 10), fireMat.clone(), p.x, 0.08, p.z); scene.add(f); fires.push({ m: f, x: p.x, z: p.z, life: 4 }); } }
+      a.lunge = Math.max(0, a.lunge - dt);
+      const baseY = d.fly ? 1.9 : climbing ? 1.15 : 0;
+      a.rig.position.y += (baseY + (d.fly ? Math.sin(time * 4 + a.bob) * 0.2 : Math.abs(Math.sin(time * 6 + a.bob)) * 0.15) - a.rig.position.y) * Math.min(1, dt * 10);
+      a.rig.position.z = a.lunge > 0 ? Math.sin(a.lunge / 0.22 * Math.PI) * 0.55 : 0;
+      if (['bicho', 'acorazado', 'jefe', 'cristalino', 'cristalito', 'sombra'].includes(a.type)) a.body.rotation.y += dt * 2;
+      if (a.wings) { const f = Math.sin(time * 20 + a.bob) * 0.6; a.wings[0].rotation.z = f; a.wings[1].rotation.z = -f; }
+      if (a.legs) a.legs.forEach((l, i) => { l.rotation.x = Math.sin(time * 14 + i) * 0.4; });
+      if (a.flash > 0) { a.flash -= dt; a.body.material = a.flash > 0 ? hitMat : a.bodyMat; }
+      if (a.bar) { if (targetable(a)) setBar(a.bar, a.hp / a.max, p.x, (d.fly ? 1.9 : 0) + d.r * 2 + 0.9, p.z, BARM.enemy); else a.bar.g.visible = false; }
+    }
+    for (let i = 0; i < aliens.length; i++) for (let j = i + 1; j < aliens.length; j++) {
+      const A = aliens[i].g.position, B = aliens[j].g.position, rr = aliens[i].d.r + aliens[j].d.r;
+      const dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
+      if (d < rr && d > 0.001) { const k = (rr - d) / 2 / d; A.x -= dx * k; A.z -= dz * k; B.x += dx * k; B.z += dz * k; }
+    }
+    for (let i = fires.length - 1; i >= 0; i--) {
+      const f = fires[i]; f.life -= dt;
+      if (f.life <= 0) { scene.remove(f.m); fires.splice(i, 1); continue; }
+      for (const b of buildings) if (!b.dead && dist2(b.x, b.z, f.x, f.z) < b.r + 0.6) damage(b, 4 * dt);
+      for (const u of liveUnits()) if (dist2(u.g.position.x, u.g.position.z, f.x, f.z) < 0.9) damage(u, 6 * dt);
+    }
+    if (S.coreHp <= 0) { dawn(false); return; }
+
+    // ---- projectiles
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.m.position.addScaledVector(b.v, dt); b.life -= dt;
+      let hit = null;
+      for (const a of aliens) if (targetable(a) && dist2(a.g.position.x, a.g.position.z, b.m.position.x, b.m.position.z) < a.d.r + 0.28) { hit = a; break; }
+      if (hit) { if (b.slow) hit.slowT = 2; hurtAlien(hit, b.dmg); }
+      else if (G.pois.nest.alive && dist2(NEST.x, NEST.z, b.m.position.x, b.m.position.z) < NEST.r) {
+        hit = true; NEST.hp -= b.dmg; NEST.eye.scale.setScalar(1.4);
+        if (NEST.hp <= 0) {
+          const n = G.pois.nest; n.alive = false; n.regrow = G.nights + 3; NEST.g.visible = false; NEST.bar.g.visible = false; G.nestKilled = true;
+          gainC(3, NEST.x, 3, NEST.z); gain(30, NEST.x, 2, NEST.z, true); burst(V(NEST.x, 1, NEST.z), 0xff4fd8, 30); S.shake = 0.35; sfx('boom');
+          aliens.filter((a) => a.guard).forEach((a) => { burst(a.g.position.clone().setY(0.6), a.d.col, 6); removeAlien(a); });
+          toast('¡Nido destruido! Esta noche vendrán menos alienígenas', 'good'); persist();
+        }
+      }
+      if (hit || b.life <= 0) { scene.remove(b.m); bullets.splice(i, 1); }
+    }
+    for (let i = acids.length - 1; i >= 0; i--) {
+      const s = acids[i]; s.life -= dt;
+      if (isGone(s.tgt) || s.life <= 0) { scene.remove(s.m); acids.splice(i, 1); continue; }
+      const tp = tpos(s.tgt), dx = tp.x - s.m.position.x, dz = tp.z - s.m.position.z, d = Math.hypot(dx, dz);
+      if (d < 0.6 + (s.tgt.r || 0) * 0.6) { damage(s.tgt, s.dmg); burst(s.m.position, 0x9dff4f, 6, 2); scene.remove(s.m); acids.splice(i, 1); continue; }
+      const st = 11 * dt; s.m.position.x += dx / d * st; s.m.position.z += dz / d * st; s.m.position.y = 0.8 + Math.min(1.2, d * 0.15);
+    }
+    for (let i = shells.length - 1; i >= 0; i--) {
+      const s = shells[i]; s.t += dt / s.dur;
+      const k = Math.min(1, s.t);
+      s.m.position.set(s.fx + (s.tx - s.fx) * k, 1.4 + Math.sin(Math.PI * k) * 6, s.fz + (s.tz - s.fz) * k);
+      if (s.t >= 1) {
+        burst(V(s.tx, 0.3, s.tz), 0xff9f5a, 14); sfx('boom');
+        aliens.slice().forEach((a) => { if (!a.d.fly && dist2(a.g.position.x, a.g.position.z, s.tx, s.tz) < s.area + a.d.r) hurtAlien(a, s.dmg); });
+        scene.remove(s.m); shells.splice(i, 1);
+      }
+    }
+    for (let i = meteors.length - 1; i >= 0; i--) {
+      const me = meteors[i]; me.t += dt / me.dur;
+      const k = Math.min(1, me.t);
+      me.mark.material.opacity = 0.5 + Math.sin(me.t * 30) * 0.3;
+      if (me.kind === 'meteor') {
+        me.m.position.set(me.x + 10 * (1 - k), 28 * (1 - k) + 0.4, me.z - 7 * (1 - k)); me.m.rotation.x += dt * 5;
+        if (Math.random() < dt * 30) burst(me.m.position, 0xff9f5a, 1, 0);
+      }
+      if (me.t >= 1) {
+        if (me.kind === 'meteor') { impact(me); scene.remove(me.m); } else boltHit(me);
+        scene.remove(me.mark); meteors.splice(i, 1);
+      }
+    }
+
+    // ---- bars
+    for (const b of buildings) { if (!b.dead && b.hp < b.max) setBar(b.bar, b.hp / b.max, b.x, b.h * b.baseScale + 0.5, b.z); else b.bar.g.visible = false; }
+    if (!CMD.dead && CMD.hp < CMD.max) setBar(CMD.bar, CMD.hp / CMD.max, player.position.x, 2.15, player.position.z); else CMD.bar.g.visible = false;
+    if (G.pois.nest.alive && NEST.hp < NEST.max) setBar(NEST.bar, NEST.hp / NEST.max, NEST.x, 3.4, NEST.z, BARM.enemy); else NEST.bar.g.visible = false;
+    DEP.forEach((D) => { if (D.prog > 0) setBar(D.bar, D.prog, D.data.x, 3, D.data.z, BARM.info); else D.bar.g.visible = false; });
+  }
+  function updateParts(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.v.y -= 14 * dt; p.m.position.addScaledVector(p.v, dt);
+      if (p.m.position.y < 0.05) { p.m.position.y = 0.05; p.v.multiplyScalar(0.5); p.v.y *= -0.3; }
+      p.life -= dt; p.m.scale.setScalar(Math.max(0.01, p.life * 1.5));
+      if (p.life <= 0) { scene.remove(p.m); parts.splice(i, 1); }
+    }
+  }
+  const look = V(0, 0, 0), camGoal = V(0, 0, 0);
+  function updateCamera(dt, time) {
+    if (started) { const r = Math.hypot(player.position.x, player.position.z), k = clamp(0.6 + (r - 10) / 20 * 0.4, 0.6, 1); look.set(player.position.x * k, 0, player.position.z * k); }
+    else look.set(Math.sin(time * 0.12) * 4, 0, Math.cos(time * 0.12) * 4);
+    camGoal.set(look.x, 25 * camScale, look.z + 16 * camScale);
+    camera.position.lerp(camGoal, Math.min(1, dt * 4));
+    if (S && S.shake > 0) { S.shake -= dt; if (!reduceMotion) { camera.position.x += (Math.random() - 0.5) * S.shake; camera.position.z += (Math.random() - 0.5) * S.shake; } }
+    camera.lookAt(camera.position.x, 0, camera.position.z - 16 * camScale);
+    sun.position.set(camera.position.x - 20, 34, camera.position.z - 2); sun.target.position.set(camera.position.x, 0, camera.position.z - 16);
+  }
+
+  // ======================= loop =======================
+  const clock = new THREE.Clock();
+  camera.position.set(0, 25, 16);
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(0.05, clock.getDelta()), time = clock.elapsedTime;
+    update(dt, time); updateParts(dt); updateCamera(dt, time);
+    hudT -= dt; if (started && hudT <= 0) { hud(); hudT = 0.1; }
+    renderer.render(scene, camera);
+  });
+  window.__cn = { W, P, fallen, G, S: () => S, buildings, aliens, troops, workers, CMD, startNight, dawn, spawnAlien, startMeteors, trainTroop, addBuilding, openBuilding, openMap, buyLab, checkPlanet };
+})();
+</script>
+</body>
+</html>
