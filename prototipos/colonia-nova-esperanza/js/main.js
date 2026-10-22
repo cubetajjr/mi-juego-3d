@@ -123,7 +123,8 @@ function beam(color, h, rad) {
 
 // ======================= boot screen while the kit loads =======================
 $('#loadTxt').textContent = 'Cargando modelos 3D…';
-await loadKit('assets/kit.glb', (p) => { $('#loadBar').style.width = Math.round(p * 100) + '%'; }, { charShadows: !lowEnd });
+// window.KIT_URL lets hosts that cannot serve .glb point at a .gltf copy of the same kit
+await loadKit(window.KIT_URL || 'assets/kit.glb', (p) => { $('#loadBar').style.width = Math.round(p * 100) + '%'; }, { charShadows: !lowEnd });
 $('#loadBar').style.width = '100%';
 
 // ======================= lights & world =======================
