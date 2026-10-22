@@ -1,7 +1,7 @@
 # Colonia Nova · edición Esperanza
 
-Versión paralela a la [v4 del sistema solar](../colonia-nova-v4): parte de la v3 y se centra en los gráficos,
-las animaciones, el sonido y la historia. Tiene su propia partida guardada.
+Versión principal de Colonia Nova. Parte de la v3 y se centra en los gráficos, las animaciones,
+el sonido y la historia.
 
 La nave colonia **Esperanza** se estrella en un planeta desconocido. Los supervivientes levantan una
 colonia alrededor de su reactor y, cada noche, las criaturas del planeta atacan atraídas por su calor.
