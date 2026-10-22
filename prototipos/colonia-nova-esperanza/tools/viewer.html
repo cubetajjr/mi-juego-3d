@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colonia Nova · visor de modelos</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d1220; color: #e9eefb; font: 13px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #info { position: fixed; left: 12px; top: 10px; background: rgba(0,0,0,.5); padding: 6px 10px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">cargando…</div>
+<script type="module">
+// Visor de comprobación: ?show=astro,bicho&clip=Run&t=0.3  (t = segundos de animación a mostrar)
+import * as THREE from '../vendor/three/three.module.min.js';
+import { GLTFLoader } from '../vendor/three/addons/loaders/GLTFLoader.js';
+const q = new URLSearchParams(location.search);
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(1); renderer.setSize(innerWidth, innerHeight, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(q.get('bg') || '#26304a');
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a2a1a, 1.2));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.4); sun.position.set(-6, 10, 6); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20 }); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0xa0764f, roughness: 1 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 500);
+const gltf = await new GLTFLoader().loadAsync('../assets/kit.glb');
+const roots = gltf.scene.children.map((c) => c.name);
+const show = (q.get('show') || roots.join(',')).split(',');
+const mixers = [];
+let x = 0; const gap = +(q.get('gap') || 4);
+const box = new THREE.Box3();
+for (const name of show) {
+  const src = gltf.scene.getObjectByName(name); if (!src) continue;
+  const o = src.clone(true); o.position.set(0, 0, 0); scene.add(o);
+  o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  const b = new THREE.Box3().setFromObject(o), w = b.max.x - b.min.x;
+  o.position.x = x - b.min.x; x += w + gap; box.expandByObject(o);
+  const clipName = name + '|' + (q.get('clip') || 'Move');
+  const clip = gltf.animations.find((a) => a.name === clipName) || gltf.animations.find((a) => a.name === name + '|Idle');
+  if (clip) { const mx = new THREE.AnimationMixer(o); mx.clipAction(clip).play(); mx.setTime(+(q.get('t') || 0)); mixers.push(mx); }
+}
+const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+const dist = Math.max(sz.x / (2 * Math.tan(THREE.MathUtils.degToRad(35) / 2) * camera.aspect), sz.y * 1.6) * 1.15 + 2;
+const yaw = +(q.get('yaw') || 25) * Math.PI / 180, pitch = +(q.get('pitch') || 22) * Math.PI / 180;
+camera.position.set(c.x + Math.sin(yaw) * dist * Math.cos(pitch), c.y + dist * Math.sin(pitch), c.z + Math.cos(yaw) * dist * Math.cos(pitch));
+camera.lookAt(c);
+document.getElementById('info').textContent = show.join(' · ') + ' — clips: ' + gltf.animations.length;
+window.__clips = gltf.animations.map((a) => a.name + ' ' + a.duration.toFixed(2) + 's');
+window.__roots = roots;
+const clock = new THREE.Clock();
+const animate = q.get('play') === '1';
+renderer.setAnimationLoop(() => { const dt = clock.getDelta(); if (animate) mixers.forEach((m) => m.update(dt)); renderer.render(scene, camera); });
+window.__ready = true;
+</script>
+</body>
+</html>
