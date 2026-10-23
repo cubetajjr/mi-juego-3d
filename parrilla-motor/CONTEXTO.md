@@ -48,7 +48,7 @@ Playwright está en `/opt/node22/lib/node_modules/playwright`; la página funcio
    Circuitos, Jugar.
 5. Quiz: ~290 preguntas, la mayoría generadas a partir de `DATA` (`genQuiz`), con «¿qué circuito es este?»
    por el trazado. Nunca repite una pregunta vista en el dispositivo (se guarda en `localStorage`).
-6. Aviso legal con contacto: **daniel.bravo.trigo@gmail.com** (lo pidió el dueño) y nota de alojamiento en GitHub Pages.
+6. Aviso legal con contacto: **peoplemakeithappen2007@gmail.com** (correo del proyecto; no publicar el nombre ni el correo personal del dueño) y nota de alojamiento en GitHub Pages.
 
 ## Actualización automática de los datos
 
