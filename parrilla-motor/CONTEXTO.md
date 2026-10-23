@@ -90,6 +90,6 @@ de la API: compruébalas.
 
 ## Sobre el dueño
 
-Daniel estudia Business and Data Analytics. Habla español y prefiere respuestas cortas y claras, sin
-tecnicismos. Le gusta la F1 y sus categorías inferiores, el baloncesto y Pokémon. Quiere proyectos que
-impresionen y que use gente de verdad, no documentos. Tiene la cuenta de GitHub `cubetajjr`.
+Habla español y prefiere respuestas cortas y claras, sin tecnicismos. Quiere proyectos que
+impresionen y que use gente de verdad. Este repositorio es público: no escribas aquí su nombre,
+su correo personal ni otros datos que lo identifiquen.
