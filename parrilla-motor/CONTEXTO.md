@@ -76,6 +76,14 @@ El dueño eligió la opción gratis. Bloque `/* ===== datos en vivo ===== */` de
 - Caché en `localStorage` (`parrilla.api.*`, se borra a los 5 días). Se refresca cada minuto y al volver a la pestaña;
   cada respuesta tiene su caducidad (3 min tras una sesión, 30 min el resto de la semana, 6 h la lista de sesiones).
   Límites: Jolpica 500 peticiones/hora por IP, OpenF1 30 cada 10 s. Cada visitante pide desde su navegador.
+- **Torre de tiempos** (botón «Vuelta a vuelta» en el panel): se reconstruye con `/laps` de OpenF1 (inicio y duración
+  de cada vuelta) más `stints`, `pit` y `race_control`: orden, diferencia con el líder y con el de delante (o «+N V»),
+  última vuelta (morado = mejor de la sesión, verde = mejor personal), neumático y vueltas que lleva, «BOX»,
+  coche de seguridad y bandera roja, y flechas de puestos ganados. En sesiones terminadas es una repetición con
+  reproductor (×5, ×20, ×60) y barra de tiempo. Si una sesión está en marcha y `/laps` devuelve vueltas, la torre
+  aparece sola «En directo» y se refresca cada 10 s: es lo que pasará con la cuenta de pago de OpenF1.
+  Con la cuenta de pago habrá que pasar las peticiones por un Worker de Cloudflare que guarde la clave y cachee
+  (si no, cada visitante gastaría peticiones de pago); bastará con cambiar `API.of1`.
 - **Sin directo de verdad:** OpenF1 gratis no da datos durante la sesión. Mientras dura, el panel dice «En directo»
   con enlace al live timing oficial y los resultados aparecen solos unos minutos después de terminar.
 - Si las APIs fallan, la web sigue con la instantánea (probado en `probar-directo.js`, escenario «sin conexión»).

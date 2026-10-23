@@ -271,6 +271,18 @@ td.ph{font:600 11px var(--body);color:var(--muted);letter-spacing:.06em}
 .flag.sc{background:var(--amber-bg);color:var(--amber);border-color:transparent}
 .flag.red{background:var(--accent);color:#fff;border-color:transparent}
 .flag.chq{background:var(--ink);color:var(--surface);border-color:transparent}
+.tw-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tw-ctl input[type=range]{flex:1 1 160px;min-width:0;accent-color:var(--accent)}
+.tw-play{width:42px;height:34px;padding:0;font-size:15px}
+.tw-st{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font:700 16px var(--display);text-transform:uppercase;letter-spacing:.03em;min-height:22px}
+.tw-st .muted{font:500 12px var(--mono);text-transform:none;letter-spacing:0}
+.twt td,.twt th{padding:6px 6px}
+.twt td.drv{font:600 14px var(--mono)}
+.twt td.drv small{display:inline;margin-left:6px;font:400 12px var(--body)}
+.mv{font:600 10px var(--mono);margin-left:3px;vertical-align:1px}.mv.up{color:var(--ok)}.mv.dn{color:var(--accent)}
+td.lc-o{color:#9b4dff;font-weight:600}td.lc-p{color:var(--ok);font-weight:600}
+.boxb{font:700 9px/1 var(--body);letter-spacing:.06em;background:var(--ink);color:var(--surface);padding:2px 4px;border-radius:2px;margin-left:6px;vertical-align:2px}
+@media (max-width:560px){.hide-s{display:none}.twt td.drv small{display:none}}
 .callout.champ{border-left-color:#c9a227;background:color-mix(in srgb,#c9a227 14%,var(--surface))}
 .callout.champ b{font:800 20px/1.15 var(--display);font-style:italic;text-transform:uppercase;display:block}
 </style>
@@ -1013,13 +1025,13 @@ function renderLegal(){
    Todo es opcional: si las APIs no responden, la web sigue con la instantánea de DATA. Nada se inventa: solo se muestra lo que llega. */
 const API={jol:"https://api.jolpi.ca/ergast/f1/",of1:"https://api.openf1.org/v1/"};
 const SEASON=2026, ROUNDS=23, LIVE_RACE_PTS=25;
-const LIVE={at:0,ok:false,tried:false,meeting:null,sess:{},sel:null,busy:false,sig:""};
+const LIVE={at:0,ok:false,tried:false,meeting:null,sess:{},sel:null,busy:false,sig:"",view:"res"};
 const LIVE_BASE={drivers:DATA.f1.drivers.map(r=>[...r]),teams:DATA.f1.teams.map(r=>[...r]),rows:DATA.f1.results.rows.map(r=>[...r]),
   status:DATA.f1.status,facts:DATA.f1.facts,title:{...DATA.f1.title},events:DATA.f1.events.map(e=>({...e})),porra:PORRA.result,news:NEWS.slice(),last:LAST_DONE};
 const apiMem={};
 /* pide una URL con caché local; ttl puede depender de lo guardado. Si falla, devuelve lo último guardado (o null) */
 async function api(url,ttl,pick){
-  const key="api."+url,c=apiMem[key]||store.get(key,null),now=Date.now();
+  const key="api.v2."+url,c=apiMem[key]||store.get(key,null),now=Date.now();
   if(c&&now-c.t<(typeof ttl==="function"?ttl(c.d):ttl)){apiMem[key]=c;LIVE.at=Math.max(LIVE.at,c.t);LIVE.ok=true;return c.d}
   try{
     const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
@@ -1111,17 +1123,25 @@ const weekendOn=()=>{const m=LIVE.meeting;if(!m)return false;const n=Date.now();
 const RC_SC=[[/VIRTUAL SAFETY CAR DEPLOYED/,"Coche de seguridad virtual"],[/VIRTUAL SAFETY CAR ENDING/,"Fin del coche de seguridad virtual"],[/SAFETY CAR DEPLOYED/,"Coche de seguridad en pista"],[/SAFETY CAR IN THIS LAP/,"El coche de seguridad se retira en esta vuelta"]];
 function pickRC(d){
   if(!Array.isArray(d))return d;
-  return d.filter(x=>x.category==="SafetyCar"||x.flag==="RED"||x.flag==="CHEQUERED"||/PENALTY|DISQUALIFIED/.test(x.message||"")).slice(-12).map(x=>({l:x.lap_number,c:x.category,f:x.flag,m:x.message}));
+  return d.filter(x=>x.category==="SafetyCar"||x.flag==="RED"||x.flag==="CHEQUERED"||(x.flag==="GREEN"&&x.scope==="Track")||/PENALTY|DISQUALIFIED/.test(x.message||"")).slice(-40).map(x=>({t:x.date?Date.parse(x.date):null,l:x.lap_number,c:x.category,f:x.flag,m:x.message}));
 }
+/* la misma URL comparte caché: el panel y la torre usan los mismos recortes */
+const PICK={
+  res:d=>Array.isArray(d)?d.map(r=>({p:r.position,n:r.driver_number,laps:r.number_of_laps,dur:r.duration,gap:r.gap_to_leader,pts:r.points,dnf:r.dnf,dns:r.dns,dsq:r.dsq})):d,
+  drv:d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,a:x.name_acronym,f:x.first_name,l:x.last_name,t:x.team_name,c:x.team_colour})):d,
+  stints:d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,a:x.lap_start,b:x.lap_end,c:x.compound,age:x.tyre_age_at_start})):d,
+  pit:d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,l:x.lap_number,t:x.date?Date.parse(x.date):null,st:x.stop_duration,ln:x.lane_duration??x.pit_duration})):d,
+  laps:d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,l:x.lap_number,t:x.date_start?Date.parse(x.date_start):null,d:x.lap_duration,po:!!x.is_pit_out_lap})):d,
+};
 async function loadSession(s,full){
   const k=s.session_key,ended=Date.parse(s.date_end),recent=Date.now()-ended<8*36e5;
   const T=d=>Array.isArray(d)&&d.length?(recent?3*6e4:864e5):(recent?6e4:36e5),O=(p,pick)=>api(API.of1+p+"?session_key="+k,T,pick);
   const race=s.session_type==="Race";
   const [res,drv,stints,pits,rc,w]=await Promise.all([
-    O("session_result",d=>Array.isArray(d)?d.map(r=>({p:r.position,n:r.driver_number,laps:r.number_of_laps,dur:r.duration,gap:r.gap_to_leader,pts:r.points,dnf:r.dnf,dns:r.dns,dsq:r.dsq})):d),
-    O("drivers",d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,a:x.name_acronym,f:x.first_name,l:x.last_name,t:x.team_name,c:x.team_colour})):d),
-    full&&race?O("stints",d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,a:x.lap_start,b:x.lap_end,c:x.compound})):d):null,
-    full&&race?O("pit",d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,l:x.lap_number,st:x.stop_duration,ln:x.lane_duration??x.pit_duration})):d):null,
+    O("session_result",PICK.res),
+    O("drivers",PICK.drv),
+    full&&race?O("stints",PICK.stints):null,
+    full&&race?O("pit",PICK.pit):null,
     full?O("race_control",pickRC):null,
     full?O("weather",d=>Array.isArray(d)&&d.length?[d[d.length-1]]:d):null,
   ]);
@@ -1150,7 +1170,7 @@ const dec=(x,d=1)=>Number(x).toLocaleString("es-ES",{maximumFractionDigits:d,min
 function ago(t){const s=Math.max(0,Math.round((Date.now()-t)/1e3));return s<60?"hace un momento":s<3600?`hace ${Math.round(s/60)} min`:s<86400?`hace ${Math.round(s/3600)} h`:`hace ${Math.round(s/86400)} d`}
 
 /* ---- panel del fin de semana ---- */
-function hubMount(){const el=$("#hub-slot");if(!el)return;el.innerHTML=hubHTML(el.dataset.full==="1");
+function hubMount(){const el=$("#hub-slot");if(!el)return;el.innerHTML=hubHTML(el.dataset.full==="1");towerMount();
   const c=el.querySelector(".spills"),p=c&&c.querySelector('[aria-pressed="true"]');if(p)c.scrollLeft=p.offsetLeft-c.offsetLeft-(c.clientWidth-p.offsetWidth)/2}
 function hubHTML(full){
   const m=LIVE.meeting;
@@ -1166,7 +1186,14 @@ function hubHTML(full){
 function sessBody(s,D){
   const st=sState(s),nm=esc(sName(s));
   if(st==="next")return `<div class="livebox" style="--c:var(--line)"><span class="eyebrow">${nm} · ${esc(dayLabel(s.date_start))} a las ${hm(s.date_start)}</span><div class="big" data-cd="${s.date_start}"></div><p class="muted" style="font-size:14px">La clasificación de la sesión aparecerá aquí unos minutos después de que termine.</p></div>`;
-  if(st==="live")return `<div class="livebox"><span class="lb"><span class="live-dot on"></span>En directo · ${nm}</span><p><b>La sesión está en marcha.</b> Termina hacia las ${hm(s.date_end)}. En cuanto acabe, la clasificación, los neumáticos y las paradas aparecerán aquí solos, sin recargar.</p><p class="muted" style="font-size:13px">Los tiempos vuelta a vuelta en directo solo se publican en el live timing oficial de F1.</p><div class="links"><a href="https://www.formula1.com/en/timing/f1-live" target="_blank" rel="noopener">Live timing oficial ↗</a></div></div>`;
+  if(st==="live"&&RP.k===s.session_key&&RP.B)return towerShell(true);
+  if(st==="live")return `<div class="livebox"><span class="lb"><span class="live-dot on"></span>En directo · ${nm}</span><p><b>La sesión está en marcha.</b> Termina hacia las ${hm(s.date_end)}. La torre de tiempos aparecerá aquí en cuanto el servicio de datos publique las vueltas; con el acceso gratuito eso ocurre al terminar la sesión. Después podrás verla entera vuelta a vuelta.</p><div class="links"><a href="https://www.formula1.com/en/timing/f1-live" target="_blank" rel="noopener">Live timing oficial ↗</a></div></div>`;
+  const tog=`<div class="seg" role="group" aria-label="Vista de la sesión" style="justify-self:start"><button data-hv="res" aria-pressed="${LIVE.view!=="tw"}">Resultado</button><button data-hv="tw" aria-pressed="${LIVE.view==="tw"}">Vuelta a vuelta</button></div>`;
+  if(LIVE.view==="tw")return tog+towerShell(false);
+  return tog+sessResult(s,D);
+}
+function sessResult(s,D){
+  const nm=esc(sName(s));
   if(!D)return `<div class="empty">Cargando ${nm}…</div>`;
   if(D.state==="off")return `<div class="empty">No se ha podido conectar con el servicio de datos de F1. Se vuelve a intentar cada minuto.</div>`;
   if(D.state==="wait")return `<div class="livebox" style="--c:var(--amber)"><span class="eyebrow">${nm} · terminada</span><p>Esperando la clasificación oficial. Se comprueba cada minuto y aparecerá aquí sola.</p></div>`;
@@ -1224,11 +1251,121 @@ function rcHTML(rc){
     else if(x.f==="CHEQUERED"){tag="Bandera a cuadros";cls="chq";txt="Final de la sesión"}
     else {tag=/DISQUALIFIED/.test(m)?"Descalificación":"Sanción";cls=""}
     return `<li><span class="lap">${x.l?"V"+x.l:""}</span><span class="flag ${cls}">${esc(tag)}</span><span${txt===m?' lang="en"':""}>${esc(txt)}</span></li>`};
-  return `<div class="sec" style="gap:8px"><h3>Dirección de carrera</h3><ul class="rc">${[...rc].reverse().map(item).join("")}</ul><span class="muted" style="font-size:12px">Banderas, coches de seguridad y sanciones. Los mensajes oficiales están en inglés.</span></div>`;
+  const shown=rc.filter(x=>x.f!=="GREEN").slice(-12);if(!shown.length)return "";
+  return `<div class="sec" style="gap:8px"><h3>Dirección de carrera</h3><ul class="rc">${[...shown].reverse().map(item).join("")}</ul><span class="muted" style="font-size:12px">Banderas, coches de seguridad y sanciones. Los mensajes oficiales están en inglés.</span></div>`;
 }
 
+/* ---- torre de tiempos ---- */
+/* Se reconstruye con las vueltas de cada piloto (/laps): orden, diferencia con el líder y con el de delante,
+   última vuelta, neumático y boxes. Sesión terminada: repetición con reproductor. Sesión en marcha: se refresca
+   cada 10 s si el servicio publica las vueltas durante la sesión (OpenF1 lo hace con la cuenta de pago). */
+const RP={k:null,B:null,T:0,play:false,speed:20,timer:null,poll:null,loading:false};
+async function towerData(s){
+  const k=s.session_key,live=sState(s)==="live",recent=Date.now()-Date.parse(s.date_end)<8*36e5;
+  const T=live?()=>8e3:d=>Array.isArray(d)&&d.length?(recent?3*6e4:864e5):6e4,O=(p,pick)=>api(API.of1+p+"?session_key="+k,T,pick);
+  const [laps,drv,stints,pits,rc]=await Promise.all([O("laps",PICK.laps),O("drivers",PICK.drv),O("stints",PICK.stints),O("pit",PICK.pit),O("race_control",pickRC)]);
+  return Array.isArray(laps)&&laps.length?towerBuild(s,{laps,drv,stints,pits,rc}):null;
+}
+function towerBuild(s,raw){
+  const race=s.session_type==="Race",by={},P={};
+  raw.laps.forEach(x=>(by[x.n]||=[]).push(x));
+  for(const n in by){
+    const L=by[n].sort((a,b)=>a.l-b.l);
+    /* paso por meta al final de cada vuelta: inicio + duración, o el inicio de la vuelta siguiente */
+    P[n]=L.map((x,i)=>{const nx=L[i+1],d=typeof x.d==="number"&&x.d>0?x.d:null,e=x.t&&d?x.t+d*1e3:nx&&nx.l===x.l+1&&nx.t?nx.t:null;return e?{l:x.l,e,d}:null}).filter(Boolean);
+  }
+  const all=Object.values(P).filter(a=>a.length);if(!all.length)return null;
+  const t0=race?Math.min(...all.map(a=>a[0].e)):Math.min(...raw.laps.map(x=>x.t).filter(Boolean),...all.map(a=>a[0].e));
+  const ok=a=>Array.isArray(a)?a:[];
+  return {s,race,P,t0,t1:Math.max(...all.map(a=>a[a.length-1].e)),total:Math.max(...all.map(a=>a[a.length-1].l)),
+    dm:drvMap(raw),stints:ok(raw.stints),pits:ok(raw.pits),rc:ok(raw.rc).filter(x=>x.t)};
+}
+function towerAt(B,T){
+  const rows=Object.entries(B.P).map(([n,A])=>{let i=0;while(i<A.length&&A[i].e<=T)i++;const last=A[i-1]||null;let best=null;
+    for(let j=0;j<i;j++)if(A[j].d&&(!best||A[j].d<best.d))best=A[j];
+    return {n:+n,A,k:last?last.l:0,e:last?last.e:Infinity,last,best}});
+  if(B.race)rows.sort((a,b)=>b.k-a.k||a.e-b.e);
+  else rows.sort((a,b)=>(a.best?a.best.d:1e9)-(b.best?b.best.d:1e9)||b.k-a.k);
+  const L=rows[0],ob=rows.reduce((m,r)=>r.best&&(m==null||r.best.d<m)?r.best.d:m,null);
+  const crossedBy=(A,t)=>{let c=0;for(const x of A)if(x.e<=t)c=x.l;return c};
+  const behind=(X,R)=>{
+    if(!X.last)return "—";
+    if(B.race){const N=crossedBy(R.A,X.e)-X.k;if(N>=1)return `+${N} V`;const c=R.A.find(y=>y.l===X.k);return c?"+"+((X.e-c.e)/1e3).toFixed(3):"—"}
+    return X.best&&R.best?"+"+(X.best.d-R.best.d).toFixed(3):"—";
+  };
+  rows.forEach((r,i)=>{
+    r.pos=i+1;r.gap=i?behind(r,L):"";r.int=i?behind(r,rows[i-1]):"";
+    const now=r.k+1,st=B.stints.filter(x=>x.n===r.n&&x.a<=now).sort((a,b)=>b.a-a.a)[0];
+    r.tyre=st&&st.c?{c:st.c,age:now-st.a+(st.age||0)}:null;
+    r.box=B.pits.some(p=>p.n===r.n&&p.t&&T>=p.t&&T<=p.t+(p.ln||25)*1e3);
+    r.lc=r.last&&r.last.d?(r.last.d===ob?"o":r.best&&r.last.d===r.best.d?"p":""):"";
+  });
+  return {rows,L};
+}
+function trackAt(B,T){
+  let st="";
+  for(const x of B.rc){if(x.t>T)continue;const m=x.m||"";
+    if(x.c==="SafetyCar")st=/DEPLOYED/.test(m)?(/VIRTUAL/.test(m)?"vsc":"sc"):/ENDING|IN THIS LAP/.test(m)?"":st;
+    else if(x.f==="RED")st="red";else if(x.f==="GREEN"&&st==="red")st="";else if(x.f==="CHEQUERED")st="chq"}
+  return st;
+}
+function towerShell(live){
+  return `<div class="sec" id="tower" data-live="${live?1:0}" style="gap:10px">
+  ${live?`<div class="tw-ctl"><span class="lb"><span class="live-dot on"></span>En directo</span><span class="muted" style="font-size:12px">Se actualiza cada 10 segundos</span></div>`
+  :`<div class="tw-ctl"><button class="btn primary tw-play" data-tw="play" aria-label="Reproducir">▶</button><input type="range" id="tw-r" min="0" max="1000" value="0" aria-label="Momento de la sesión"><div class="seg" role="group" aria-label="Velocidad">${[5,20,60].map(v=>`<button data-tws="${v}" aria-pressed="${RP.speed===v}">×${v}</button>`).join("")}</div></div>`}
+  <div class="tw-st" id="tw-st"></div>
+  <div class="tbl"><table class="twt"><thead id="tw-h"></thead><tbody id="tw-rows"><tr><td class="muted">Cargando las vueltas…</td></tr></tbody></table></div></div>`;
+}
+async function towerMount(){
+  const el=$("#tower");if(!el){towerStop();return}
+  const s=hubPick();if(!s)return;
+  const live=el.dataset.live==="1";
+  if(RP.k!==s.session_key){towerStop();Object.assign(RP,{k:s.session_key,B:null})}
+  if(live&&!RP.poll)RP.poll=setInterval(async()=>{const p=hubPick();if(!$("#tower")||!p||p.session_key!==RP.k){towerStop();return}const B=await towerData(p).catch(()=>null);if(B){RP.B=B;RP.T=Date.now();towerSync()}},1e4);
+  if(RP.B){if(live)RP.T=Date.now();towerSync();return}
+  if(RP.loading)return;RP.loading=true;
+  const B=await towerData(s).catch(()=>null);RP.loading=false;
+  if(RP.k!==s.session_key)return;
+  if(!B){const r=$("#tw-rows");if(r)r.innerHTML=`<tr><td>No se han podido cargar las vueltas de esta sesión. Se vuelve a intentar en un minuto.</td></tr>`;return}
+  RP.B=B;RP.T=live?Date.now():B.t0;towerSync();
+}
+function towerStop(){towerPlay(false);clearInterval(RP.poll);RP.poll=null}
+function towerPlay(on){
+  RP.play=on;clearInterval(RP.timer);RP.timer=null;
+  if(on&&RP.B){if(RP.T>=RP.B.t1)RP.T=RP.B.t0;
+    RP.timer=setInterval(()=>{if(!RP.B||!$("#tw-rows")){towerPlay(false);return}RP.T+=250*RP.speed;if(RP.T>=RP.B.t1){RP.T=RP.B.t1;towerPlay(false)}towerSync()},250)}
+  const b=$(".tw-play");if(b){b.textContent=on?"❚❚":"▶";b.setAttribute("aria-label",on?"Pausa":"Reproducir")}
+}
+const clockT=ms=>{const m=Math.max(0,Math.floor(ms/6e4));return `Minuto ${m}`};
+function towerSync(){
+  const B=RP.B,body=$("#tw-rows");if(!B||!body)return;
+  const live=$("#tower").dataset.live==="1",T=Math.min(Math.max(RP.T,B.t0),B.t1),{rows,L}=towerAt(B,T),race=B.race;
+  /* flechas: puestos ganados o perdidos desde la vuelta anterior del líder */
+  let prev={};if(race&&L.last){const i=L.A.indexOf(L.last);if(i>0)towerAt(B,L.A[i-1].e).rows.forEach(r=>prev[r.n]=r.pos)}
+  const r=$("#tw-r");if(r&&document.activeElement!==r)r.value=Math.round((T-B.t0)/Math.max(1,B.t1-B.t0)*1000);
+  const ts={sc:["sc","Coche de seguridad"],vsc:["sc","Coche de seguridad virtual"],red:["red","Bandera roja"],chq:["chq","Bandera a cuadros"]}[trackAt(B,T)];
+  const lastE=Math.max(...rows.map(x=>x.last?x.last.e:0));
+  $("#tw-st").innerHTML=`<span>${race?(T>=B.t1&&!live?`Final · ${B.total} vueltas`:`Vuelta ${Math.min(L.k+1,B.total+(live?1:0))}${live?"":" de "+B.total}`):clockT(T-Date.parse(B.s.date_start))}</span>${ts?`<span class="flag ${ts[0]}">${ts[1]}</span>`:""}${live?`<span class="muted">· último paso por meta ${ago(lastE)}</span>`:""}`;
+  $("#tw-h").innerHTML=`<tr><th>Pos</th><th>Piloto</th>${race?'<th class="r">Líder</th><th class="r hide-s">Intervalo</th><th class="r">Última</th>':'<th class="r">Mejor</th><th class="r">Dif.</th><th class="r hide-s">Última</th><th class="r hide-s">Vtas</th>'}<th>Neum.</th></tr>`;
+  const old={};body.querySelectorAll("tr[data-n]").forEach(tr=>old[tr.dataset.n]=tr.getBoundingClientRect().top);
+  body.innerHTML=rows.map(x=>{
+    const d=B.dm[x.n]||{},full=d.l?drvName(d.f,d.l):"#"+x.n,mv=prev[x.n]?prev[x.n]-x.pos:0;
+    const ty=x.tyre?`<span class="cmp ${CMP[x.tyre.c]?"cmp-"+CMP[x.tyre.c][0]:"cmp-U"}" title="${esc((CMP[x.tyre.c]||["","Desconocido"])[1])}"></span><span class="mono" style="font-size:12px">${x.tyre.age}</span>`:"";
+    const last=`<td class="tm ${race?"":"hide-s "}${x.lc?"lc-"+x.lc:""}">${x.last&&x.last.d?lapT(x.last.d):"—"}</td>`;
+    return `<tr data-n="${x.n}" class="${x.pos===1?"p1":""} ${isFav("f1",full)?"fav":""}"><td class="pos">${x.pos}${mv>0?`<span class="mv up">▲${mv}</span>`:mv<0?`<span class="mv dn">▼${-mv}</span>`:""}</td>
+      <td class="drv"><span class="tc" style="--tc:${dColor(d)}"></span>${esc(d.a||"#"+x.n)}<small>${esc(surname(full))}</small>${x.box?'<span class="boxb">BOX</span>':""}</td>
+      ${race?`<td class="tm">${x.pos===1?"—":esc(x.gap)}</td><td class="tm hide-s">${x.pos===1?"":esc(x.int)}</td>${last}`
+      :`<td class="tm ${x.best&&x.best.d===rows[0].best?.d?"lc-o":""}">${x.best?lapT(x.best.d):"—"}</td><td class="tm">${x.pos===1?"":esc(x.gap)}</td>${last}<td class="tm hide-s">${x.k||""}</td>`}
+      <td>${ty}</td></tr>`}).join("");
+  if(matchMedia("(prefers-reduced-motion: no-preference)").matches)body.querySelectorAll("tr[data-n]").forEach(tr=>{
+    const o=old[tr.dataset.n];if(o==null)return;const dy=o-tr.getBoundingClientRect().top;if(Math.abs(dy)<2)return;
+    tr.style.transition="none";tr.style.transform=`translateY(${dy}px)`;tr.getBoundingClientRect();
+    requestAnimationFrame(()=>{tr.style.transition="transform .5s ease";tr.style.transform=""})});
+}
+document.addEventListener("input",e=>{if(e.target.id==="tw-r"&&RP.B){RP.T=RP.B.t0+e.target.value/1000*(RP.B.t1-RP.B.t0);towerSync()}});
+
 /* ---- ciclo de actualización: cada minuto y al volver a la pestaña ---- */
-function liveSig(){const F=DATA.f1,m=LIVE.meeting;return JSON.stringify([F.drivers,F.results.rows.length,PORRA.result,!!F.champion,m&&m.map(s=>[s.session_key,sState(s),(LIVE.sess[s.session_key]||{}).state])])}
+function liveSig(){const F=DATA.f1,m=LIVE.meeting;return JSON.stringify([F.drivers,F.results.rows.length,PORRA.result,!!F.champion,m&&m.map(s=>[s.session_key,sState(s),(LIVE.sess[s.session_key]||{}).state]),RP.B?RP.k:0])}
 async function liveTick(){
   if(LIVE.busy)return;LIVE.busy=true;
   try{
@@ -1239,6 +1376,7 @@ async function liveTick(){
       const pick=hubPick();
       for(const s of m){if(sState(s)!=="done")continue;const full=s===pick;const prev=LIVE.sess[s.session_key];
         if(full||!prev||!prev.full)LIVE.sess[s.session_key]=await loadSession(s,full)||prev}
+      if(pick&&sState(pick)==="live"&&!(RP.k===pick.session_key&&RP.B)){const B=await towerData(pick).catch(()=>null);if(B){towerStop();Object.assign(RP,{k:pick.session_key,B,T:Date.now()})}}
     }
   }catch(e){}
   LIVE.tried=true;LIVE.busy=false;stampUpdate();
@@ -1274,6 +1412,9 @@ document.addEventListener("click",e=>{
   const cb=e.target.closest("[data-circ]");if(cb){go("circuitos/"+cb.dataset.circ);return}
   const gt=e.target.closest("[data-goto]");if(gt){go(gt.dataset.goto);return}
   const sp=e.target.closest("[data-sess]");if(sp){hubSelect(+sp.dataset.sess);return}
+  const hv=e.target.closest("[data-hv]");if(hv){LIVE.view=hv.dataset.hv;towerStop();hubMount();return}
+  if(e.target.closest('[data-tw="play"]')){towerPlay(!RP.play);return}
+  const tws=e.target.closest("[data-tws]");if(tws){RP.speed=+tws.dataset.tws;document.querySelectorAll("[data-tws]").forEach(b=>b.setAttribute("aria-pressed",b===tws));return}
   const qa=e.target.closest("[data-qa]");if(qa){quizAnswer(+qa.dataset.qa);return}
   if(e.target.closest("#qnext")){quizNext();return}
   const st=e.target.closest(".star[data-fav]");

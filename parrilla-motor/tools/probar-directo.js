@@ -28,7 +28,27 @@ const jolpica = {
 };
 const T = (d, h) => new Date(Date.parse(d) + h * 36e5).toISOString().replace('.000Z', '+00:00');
 const SES = [[9901, 'Practice 1', 'Practice', '2026-10-23T17:30:00Z', 1], [9902, 'Practice 2', 'Practice', '2026-10-23T21:00:00Z', 1], [9903, 'Practice 3', 'Practice', '2026-10-24T17:30:00Z', 1], [9904, 'Qualifying', 'Qualifying', '2026-10-24T21:00:00Z', 1], [9905, 'Race', 'Race', '2026-10-25T20:00:00Z', 2]];
+// vueltas de prueba: ritmo fijo por piloto; Hamilton adelanta a Verstappen tras las paradas y Russell acaba doblado
+const RITMO = { 9905: [[95.0, 95.0], [97.5, 97.5], [95.1, 95.15], [95.05, 95.4], [95.3, 95.3]] }; // en el orden de PILOTOS
+const SALIDA = { 9905: '2026-10-25T20:03:00Z', 9904: '2026-10-24T21:00:00Z', 9901: '2026-10-23T17:30:00Z' };
+let HASTA = Infinity; // en el escenario «directo» solo existen las vueltas ya terminadas
+function vueltas(k) {
+  if (!SALIDA[k]) return [];
+  const out = [], t0 = Date.parse(SALIDA[k]);
+  PILOTOS.forEach((p, i) => {
+    let t = t0 + (k === 9905 ? 0 : i * 6e4);
+    const n = k === 9905 ? (i === 1 ? 55 : 56) : 12;
+    for (let l = 1; l <= n; l++) {
+      const d = k === 9905 ? RITMO[k][i][l <= 20 ? 0 : 1] + (l === 20 ? 20 : 0) : 92 + i * 0.15 + (l % 3) * 0.4 + (l === 6 ? 60 : 0);
+      if (t + d * 1e3 <= HASTA) out.push({ meeting_key: 1300, session_key: k, driver_number: p[2], lap_number: l, date_start: l === 1 && i === 0 ? null : new Date(t).toISOString(), lap_duration: l === 1 && k === 9905 ? null : +d.toFixed(3), is_pit_out_lap: l === 21, duration_sector_1: null, duration_sector_2: null, duration_sector_3: null, i1_speed: null, i2_speed: null, st_speed: null, segments_sector_1: [], segments_sector_2: [], segments_sector_3: [] });
+      t += d * 1e3;
+    }
+  });
+  return out;
+}
+const enVuelta = l => new Date(Date.parse(SALIDA[9905]) + l * 95e3).toISOString();
 const openf1 = {
+  laps: vueltas,
   sessions: () => SES.map(s => ({ session_key: s[0], session_name: s[1], session_type: s[2], date_start: T(s[3], 0), date_end: T(s[3], s[4]), meeting_key: 1300, circuit_key: 9, circuit_short_name: 'Austin', country_name: 'United States', location: 'Austin', gmt_offset: '-05:00:00', year: 2026, is_cancelled: false })),
   drivers: k => PILOTOS.map(p => ({ meeting_key: 1300, session_key: k, driver_number: p[2], broadcast_name: p[1].toUpperCase(), full_name: `${p[0]} ${p[1].toUpperCase()}`, name_acronym: p[6], team_name: p[4], team_colour: p[5], first_name: p[0], last_name: p[1], country_code: null })),
   session_result: k => k === 9905
@@ -37,12 +57,13 @@ const openf1 = {
       ? PILOTOS.map((p, i) => ({ session_key: k, position: i + 1, driver_number: p[2], number_of_laps: 18, dnf: false, dns: false, dsq: false, duration: [93.0, 92.5, i < 4 ? 92.1 + i * 0.1 : null], gap_to_leader: [0, 0, i < 4 ? i * 0.1 : null] }))
       : PILOTOS.map((p, i) => ({ session_key: k, position: i + 1, driver_number: PILOTOS[(i + (k - 9900)) % 5][2], number_of_laps: 25, dnf: false, dns: false, dsq: false, duration: 95 + i * 0.2, gap_to_leader: i ? i * 0.2 : 0 })),
   stints: k => k !== 9905 ? [] : PILOTOS.flatMap(p => [{ session_key: k, stint_number: 1, driver_number: p[2], lap_start: 1, lap_end: 20, compound: 'MEDIUM', tyre_age_at_start: 0 }, { session_key: k, stint_number: 2, driver_number: p[2], lap_start: 21, lap_end: 56, compound: 'HARD', tyre_age_at_start: 0 }]),
-  pit: k => k !== 9905 ? [] : PILOTOS.map((p, i) => ({ session_key: k, driver_number: p[2], lap_number: 20, date: null, pit_duration: 21 + i, lane_duration: 21 + i, stop_duration: 2.3 + i / 10 })),
-  race_control: k => [{ session_key: k, date: null, driver_number: null, lap_number: 12, category: 'SafetyCar', flag: null, scope: 'Track', sector: null, message: 'SAFETY CAR DEPLOYED' }, { session_key: k, lap_number: 56, category: 'Flag', flag: 'CHEQUERED', scope: 'Track', message: 'CHEQUERED FLAG' }, { session_key: k, lap_number: 30, category: 'Flag', flag: 'YELLOW', scope: 'Sector', message: 'YELLOW IN TRACK SECTOR 4' }],
+  pit: k => k !== 9905 ? [] : PILOTOS.map((p, i) => ({ session_key: k, driver_number: p[2], lap_number: 20, date: enVuelta(20.5), pit_duration: 21 + i, lane_duration: 21 + i, stop_duration: 2.3 + i / 10 })),
+  race_control: k => [{ session_key: k, date: enVuelta(11.5), driver_number: null, lap_number: 12, category: 'SafetyCar', flag: null, scope: 'Track', sector: null, message: 'SAFETY CAR DEPLOYED' }, { session_key: k, date: enVuelta(14.5), lap_number: 15, category: 'SafetyCar', flag: null, scope: 'Track', message: 'SAFETY CAR IN THIS LAP' }, { session_key: k, date: enVuelta(30), lap_number: 30, category: 'Flag', flag: 'YELLOW', scope: 'Sector', message: 'YELLOW IN TRACK SECTOR 4' }, { session_key: k, date: enVuelta(56), lap_number: 56, category: 'Flag', flag: 'CHEQUERED', scope: 'Track', message: 'CHEQUERED FLAG' }],
   weather: k => [{ session_key: k, date: null, air_temperature: 26.4, track_temperature: 38.9, humidity: 41, pressure: 1010, rainfall: 0, wind_direction: 180, wind_speed: 2.5 }],
 };
 const CORS = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
 async function servir(ctx, modo) {
+  HASTA = modo === 'pago' ? Date.parse('2026-10-24T21:30:00Z') : Infinity;
   await ctx.route(/api\.(openf1\.org|jolpi\.ca)/, r => {
     if (modo === 'sin-red') return r.abort();
     const u = new URL(r.request().url());
@@ -50,11 +71,12 @@ async function servir(ctx, modo) {
       const m = u.pathname.match(/\/ergast\/f1\/2026\/(?:(\d+)\/)?([a-z]+)\/?$/);
       const f = m && jolpica[m[2]];
       // antes de la carrera, Jolpica aún no tiene la ronda 18
-      if (modo === 'antes' || !f || (m[1] && m[1] !== '18')) return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(MR({ RaceTable: { Races: [] } })) });
+      if (modo === 'antes' || modo === 'pago' || !f || (m[1] && m[1] !== '18')) return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(MR({ RaceTable: { Races: [] } })) });
       return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(f()) });
     }
     const ep = u.pathname.replace('/v1/', ''), k = +u.searchParams.get('session_key');
     const f = openf1[ep];
+    if (modo === 'antes' && ep === 'laps' && k === 9904) return r.fulfill({ status: 200, headers: CORS, body: '[]' }); // gratis: nada durante la sesión
     return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(f ? f(k) : []) });
   });
 }
@@ -94,6 +116,25 @@ const texto = (pg, sel) => pg.$eval(sel, e => e.innerText).catch(() => '');
     comprobar(/Carrera · P1 Antonelli/.test(await texto(pg, '.grid2')), 'P1 de la carrera en la agenda');
     comprobar(/GP de la Ciudad de México/i.test(await texto(pg, '.feature')), 'la cabecera pasa al siguiente GP');
     comprobar(/F1 en vivo/.test(await texto(pg, '#stamp')), 'indicador «F1 en vivo» en la cabecera');
+    await pg.click('[data-hv="tw"]'); await pg.waitForTimeout(500);
+    comprobar((await pg.$$('#tw-rows tr[data-n]')).length === 5, 'torre: 5 pilotos en la repetición');
+    comprobar(/Vuelta 2 de 56/i.test(await texto(pg, '#tw-st')), 'torre: empieza al final de la primera vuelta');
+    const orden = () => pg.$$eval('#tw-rows tr[data-n] td.drv', t => t.map(x => x.innerText.slice(0, 3)));
+    await pg.evaluate(() => { RP.T = RP.B.t0 + 11 * 95e3; towerSync(); });
+    const o10 = await orden();
+    comprobar(o10[1] === 'VER' && o10[2] === 'HAM', 'torre: Verstappen va 2.º antes de las paradas');
+    comprobar(/Coche de seguridad/i.test(await texto(pg, '#tw-st')), 'torre: coche de seguridad en la vuelta 12');
+    await pg.evaluate(() => { RP.T = RP.B.t1; towerSync(); });
+    const fin = await orden(), filas = await texto(pg, '#tw-rows');
+    comprobar(fin.join(',') === 'ANT,HAM,VER,LEC,RUS', 'torre: orden final igual que la clasificación');
+    comprobar(/\+1 V/.test(filas), 'torre: Russell aparece doblado');
+    comprobar(/Final · 56 vueltas/i.test(await texto(pg, '#tw-st')), 'torre: marca el final');
+    await pg.evaluate(() => { RP.T = RP.B.t0; towerSync(); });
+    await pg.click('[data-tw="play"]'); await pg.waitForTimeout(700);
+    comprobar(await pg.evaluate(() => RP.play && RP.T > RP.B.t0), 'torre: el botón de reproducir avanza la sesión');
+    await pg.click('[data-tw="play"]');
+    await pg.screenshot({ path: path.join(process.env.SHOTS || '/tmp', 'torre-escritorio.png'), fullPage: false, clip: { x: 0, y: 820, width: 1280, height: 900 } }).catch(() => {});
+    await pg.click('[data-hv="res"]'); await pg.waitForTimeout(150);
     await pg.click('[data-sess="9904"]'); await pg.waitForTimeout(400);
     const q = await texto(pg, '#hub-slot');
     comprobar(/Clasificación · Clasificación/.test(q) && /Q3/.test(q) && /1:32\.100/.test(q), 'cambiar a la clasificación muestra Q1/Q2/Q3');
@@ -114,6 +155,12 @@ const texto = (pg, sel) => pg.$eval(sel, e => e.innerText).catch(() => '');
     comprobar(/En directo · Clasificación/i.test(home) && /La sesión está en marcha/.test(home), 'la sesión en curso aparece en directo');
     comprobar(/P1 /.test(await texto(pg, '.grid2')), 'la agenda muestra el P1 de los libres ya disputados');
     comprobar(!/Kimi Antonelli, campeón del mundo/i.test(home), 'sin Mundial nuevo no se declara campeón');
+  });
+  await escenario(b, 'Directo-con-datos (24 oct, 21:30 UTC)', '2026-10-24T21:30:00Z', 'pago', async pg => {
+    await pg.evaluate(() => liveTick()); await pg.waitForTimeout(800);
+    const hub = await texto(pg, '#hub-slot');
+    comprobar(/Se actualiza cada 10 segundos/.test(hub) && (await pg.$$('#tw-rows tr[data-n]')).length === 5, 'si llegan vueltas durante la sesión, la torre sale en directo');
+    comprobar(/Minuto 2\d|Minuto 30/i.test(await texto(pg, '#tw-st')), 'torre en directo: muestra el minuto de la sesión');
   });
   await escenario(b, 'Sin-conexión (25 oct, 23:30 UTC)', '2026-10-25T23:30:00Z', 'sin-red', async pg => {
     const home = await texto(pg, '#main');
