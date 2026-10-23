@@ -232,6 +232,47 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
 .prules li{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding-bottom:4px}
 .legal h2{font-size:18px;margin-top:8px}
 .btn{font:600 13px var(--body);padding:7px 12px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);color:var(--ink);cursor:pointer}
+/* datos en vivo */
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;flex:none}
+.live-dot.ok{background:var(--ok)}
+@media (prefers-reduced-motion:no-preference){.live-dot.on{animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}60%{box-shadow:0 0 0 6px transparent}}
+.stamp{display:flex;align-items:center;gap:6px}
+@media (max-width:560px){.stamp:not(.on){display:none}}
+.lb{font:700 10px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.sp1{font-weight:600;white-space:nowrap}
+.spills{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.spills::-webkit-scrollbar{display:none}
+.spill{flex:none;display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--sunk);color:var(--ink);font:600 13px var(--body);padding:6px 11px;border-radius:999px;cursor:pointer}
+.spill .st{font:500 11px var(--mono);color:var(--muted)}
+.spill[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.spill[aria-pressed="true"] .st{color:inherit;opacity:.75}
+.livebox{display:grid;gap:8px;border:1px solid var(--line);border-left:4px solid var(--c,var(--accent));border-radius:6px;padding:14px;background:var(--sunk)}
+.livebox p{margin:0}
+.livebox .big{font:800 30px/1 var(--display);font-style:italic;font-variant-numeric:tabular-nums}
+.wx{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:12px;color:var(--muted)}
+.wx b{display:block;font:600 15px var(--mono);color:var(--ink)}
+.hubgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px;align-items:start}
+td.tm{font:500 13px var(--mono);text-align:right}
+td.ph{font:600 11px var(--body);color:var(--muted);letter-spacing:.06em}
+.drv small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.tyres{display:grid;gap:5px}
+.ty{display:grid;grid-template-columns:38px minmax(0,1fr) 20px;gap:8px;align-items:center;font:500 12px var(--mono)}
+.ty .lane{position:relative;height:14px;background:var(--sunk);border-radius:3px}
+.ty .sg{position:absolute;top:0;bottom:0;border-radius:3px;border:1px solid var(--surface);font:700 9px/12px var(--mono);text-align:center;overflow:hidden;color:#14181d}
+.ty .np{color:var(--muted);text-align:right}
+.cmp{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;margin-right:4px}
+.cmp-S{background:#e8002d;color:#fff!important}.cmp-M{background:#ffd12e}.cmp-H{background:#f2f2ee;box-shadow:inset 0 0 0 1px #9aa0a6}.cmp-I{background:#43b047;color:#fff!important}.cmp-W{background:#2f6ee5;color:#fff!important}.cmp-U{background:#9aa3ad}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.rc{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13px}
+.rc li{display:grid;grid-template-columns:34px auto minmax(0,1fr);gap:8px;align-items:baseline}
+.rc .lap{font:500 12px var(--mono);color:var(--muted)}
+.flag{font:700 10px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:3px;white-space:nowrap;border:1px solid var(--line)}
+.flag.sc{background:var(--amber-bg);color:var(--amber);border-color:transparent}
+.flag.red{background:var(--accent);color:#fff;border-color:transparent}
+.flag.chq{background:var(--ink);color:var(--surface);border-color:transparent}
+.callout.champ{border-left-color:#c9a227;background:color-mix(in srgb,#c9a227 14%,var(--surface))}
+.callout.champ b{font:800 20px/1.15 var(--display);font-style:italic;text-transform:uppercase;display:block}
 </style>
 
 </head><body>
@@ -493,7 +534,7 @@ function titleBlock(k){
   const d=DATA[k]; if(!d.title) return "";
   const c=cv(k);
   if(k==="f1"){
-    const sc=f1Clinch(), nx=d.events.find(e=>!e.done), L=d.drivers[0];
+    const sc=f1Clinch(), nx=d.events.find(e=>!e.done)||{place:"la próxima carrera"}, L=d.drivers[0];
     const max=d.title.racesLeft*d.title.ptsPerRace;
     const cont=contenders("f1"), nm=L[0].split(" ").slice(-1);
     let p;
@@ -507,6 +548,7 @@ function titleBlock(k){
   }
   return `<div class="callout" style="--c:${c}"><p>${esc(d.title.text)}</p></div>`;
 }
+function champBlock(){const L=DATA.f1.drivers[0];return `<div class="callout champ"><b>🏆 ${esc(L[0])}, campeón del mundo</b><p>${esc(DATA.f1.champion)}</p></div>`}
 function bars(k,cont,max){
   const D=DATA[k].drivers, top=D[0][2], show=D.slice(0,Math.max(cont.length+1,4));
   return `<div class="bars" style="--c:${cv(k)}" aria-label="Pilotos con opciones">${show.map(r=>{const alive=cont.includes(r);return `<div class="bar ${alive?"":"out"}"><span class="nm">${esc(r[0])}</span><span class="track"><span class="fill" style="width:${(r[2]/top*100).toFixed(1)}%"></span></span><span class="v">${r[2]===top?r[2]:"−"+(top-r[2])}</span></div>`}).join("")}<span class="muted" style="font-size:12px">${cont.length} pilotos con opciones matemáticas. En gris, los ya descartados.</span></div>`;
@@ -542,8 +584,8 @@ function renderHome(){
         <span class="muted">${esc(C.n||"")}, ${esc(C.city||"")}</span>
       </div>
       ${next?`<div class="sec" style="gap:4px"><span class="eyebrow">Próxima sesión · ${esc(SERIES[next.k].label)} · ${esc(next.n)}</span><div class="cd" id="cd" data-t="${next.t}"></div></div>`:""}
-      <div class="sched">${(f1next.s||[]).map(s=>`<div><span class="sess">${esc(s[0])}</span><span>${dayLabel(s[1])}</span><span class="t">${hm(s[1])}${s[2]?' <span class="est">Estimada</span>':""}</span></div>`).join("")}</div>
-      ${titleBlock("f1").split('<div class="bars"')[0]}
+      <div class="sched">${(f1next.s||[]).map(s=>{const p1=sessP1(s[1]);return `<div><span class="sess">${esc(s[0])}</span><span>${dayLabel(s[1])}${p1?` · <span class="sp1">P1 ${esc(p1)}</span>`:""}</span><span class="t">${liveNow(s[1],s[0])?liveBadge:hm(s[1])}${s[2]?' <span class="est">Estimada</span>':""}</span></div>`}).join("")}</div>
+      ${DATA.f1.champion?champBlock():titleBlock("f1").split('<div class="bars"')[0]}
     </div>
     <div class="map">
       ${trace(f1next.track,"trace","Trazado de "+(C.n||""))}
@@ -556,10 +598,11 @@ function renderHome(){
       </div>
     </div>
   </section>
+  <div id="hub-slot"></div>
   <div class="grid2">
     <section class="panel sec">
       <h2>Agenda de la semana</h2>
-      ${Object.keys(groups).length?Object.values(groups).map(list=>`<div class="day"><span class="eyebrow">${dayLabel(list[0].t)}</span>${list.map(s=>`<div class="row ${new Date(s.t).getTime()<now?"past":""}"><span class="t">${hm(s.t)}</span>${chip(s.k)}<span class="nm">${esc(s.ev.name)} · ${esc(s.n)}</span>${s.est?'<span class="est">Estimada</span>':"<span></span>"}</div>`).join("")}</div>`).join(""):'<div class="empty">No hay sesiones programadas en los próximos nueve días.</div>'}
+      ${Object.keys(groups).length?Object.values(groups).map(list=>`<div class="day"><span class="eyebrow">${dayLabel(list[0].t)}</span>${list.map(s=>{const on=liveNow(s.t,s.n),p1=s.k==="f1"?sessP1(s.t):"";return `<div class="row ${new Date(s.t).getTime()<now&&!on?"past":""}"><span class="t">${hm(s.t)}</span>${chip(s.k)}<span class="nm">${esc(s.ev.name)} · ${esc(s.n)}${p1?` · <span class="sp1">P1 ${esc(p1)}</span>`:""}</span>${on?liveBadge:s.est?'<span class="est">Estimada</span>':"<span></span>"}</div>`}).join("")}</div>`).join(""):'<div class="empty">No hay sesiones programadas en los próximos nueve días.</div>'}
       ${tbcSoon.length?`<div class="day"><span class="eyebrow">Horario pendiente de publicación</span>${tbcSoon.map(x=>`<div class="row"><span class="t">—</span>${chip(x.k)}<span class="nm">${esc(x.ev.name)} · ${dRange(x.ev.start,x.ev.end)}</span><span></span></div>`).join("")}</div>`:""}
     </section>
     <div class="sec">
@@ -575,7 +618,7 @@ function renderHome(){
   </div>
   <section class="panel promo">
     <div><span class="eyebrow">Quiz del día</span><h3>${streakInfo().hist[todayKey()]?"Ya has jugado hoy: "+streakInfo().hist[todayKey()].score+" de "+QN+" aciertos":"Cinco preguntas nuevas cada día"}</h3></div>
-    <div><span class="eyebrow">Porra · ${esc(PORRA.title)}</span><h3>${store.get("porra."+PORRA.id,null)?"Pronóstico guardado":"Elige pole y podio antes de la clasificación"}</h3></div>
+    <div><span class="eyebrow">Porra · ${esc(PORRA.title)}</span><h3>${(()=>{const sv=store.get("porra."+PORRA.id,null);if(PORRA.result)return sv?`Resultado publicado: ${porraScore(sv,PORRA.result)} puntos`:"Resultado publicado";if(Date.now()>=Date.parse(PORRA.lock))return sv?"Pronóstico cerrado, pendiente del resultado":"Pronósticos cerrados";return sv?"Pronóstico guardado":"Elige pole y podio antes de la clasificación"})()}</h3></div>
     <button class="btn primary" data-goto="jugar">Jugar</button>
   </section>
   <section class="panel sec">
@@ -586,7 +629,7 @@ function renderHome(){
     <h2>Noticias</h2>
     <div class="news">${NEWS.map(newsItem).join("")}</div>
   </section>`;
-  tick();
+  hubMount();tick();
 }
 function newsItem(n){return `<article><div class="meta">${chip(n.cat)}<span>${esc(n.d)}</span><span>·</span><span>${esc(n.src)}</span></div><a href="${n.u}" target="_blank" rel="noopener">${esc(n.t)}</a><span class="muted" style="font-size:14px">${esc(n.s)}</span></article>`}
 function favCard(id){
@@ -601,11 +644,12 @@ setInterval(tick,1000);
 /* ===== categoría ===== */
 function renderSeries(k){
   const d=DATA[k],S=SERIES[k],c=cv(k);
-  const tabs=[["clas","Clasificación"],["res","Resultados"],["cal","Calendario"],["news","Noticias"]].filter(t=>(t[0]!=="res"||d.results)&&(t[0]!=="clas"||d.drivers||d.series)&&(t[0]!=="news"||NEWS.some(n=>n.cat===k)));
+  const tabs=[["clas","Clasificación"],...(k==="f1"?[["wk","Fin de semana"]]:[]),["res","Resultados"],["cal","Calendario"],["news","Noticias"]].filter(t=>(t[0]!=="res"||d.results)&&(t[0]!=="clas"||d.drivers||d.series)&&(t[0]!=="news"||NEWS.some(n=>n.cat===k)));
   if(!tabs.some(t=>t[0]===sub))sub=tabs[0][0];
   let body="";
   if(sub==="clas") body=clasView(k);
   if(sub==="res") body=resView(k);
+  if(sub==="wk") body=`<div id="hub-slot" data-full="1"></div>`;
   if(sub==="cal") body=`<section class="panel sec" style="--c:${c}"><div class="cal">${d.events.map((e,i)=>evRow(e,i===d.events.findIndex(x=>!x.done),k)).join("")}</div></section>`;
   if(sub==="news") body=`<section class="panel sec"><div class="news">${NEWS.filter(n=>n.cat===k).map(newsItem).join("")}</div></section>`;
   $("#main").innerHTML=`
@@ -617,12 +661,13 @@ function renderSeries(k){
   </section>
   <div class="subtabs" role="tablist" style="--c:${c}">${tabs.map(t=>`<button class="subtab" role="tab" aria-selected="${t[0]===sub}" data-sub="${t[0]}">${t[1]}</button>`).join("")}</div>
   ${body}`;
+  if(sub==="wk")hubMount();
 }
 function clasView(k){
   const d=DATA[k],c=cv(k);
   if(d.series) return `<section class="panel sec"><div class="series-list">${d.series.map(s=>`<article><div class="hdr"><b>${esc(s.n)}</b><span class="badge muted">${esc(s.t||"En juego")}</span></div><span class="muted" style="font-size:14px">${esc(s.s)}</span></article>`).join("")}</div></section>`;
   const teams=d.teams||(d.partial?null:Object.entries(d.drivers.reduce((m,r)=>{if(r[1])m[r[1]]=(m[r[1]]||0)+r[2];return m},{})).sort((a,b)=>b[1]-a[1]));
-  const side = d.title? `<section class="panel sec" style="--c:${c}"><h2>Lucha por el título</h2>${titleBlock(k)}</section>` : d.champion? `<section class="panel sec" style="--c:${c}"><h2>Campeón 2026</h2><div class="callout" style="--c:${c}"><p>${esc(d.champion)}</p></div></section>`:"";
+  const side = d.title? `<section class="panel sec" style="--c:${c}"><h2>Lucha por el título</h2>${titleBlock(k)}</section>` : d.champion? `<section class="panel sec" style="--c:${c}"><h2>Campeón 2026</h2>${k==="f1"?champBlock():`<div class="callout" style="--c:${c}"><p>${esc(d.champion)}</p></div>`}</section>`:"";
   return `<div class="grid2">
     <section class="panel sec" style="--c:${c}">
       <div class="hdr"><h2>${teamView?"Equipos":"Pilotos"}</h2>${teams?`<div class="seg" role="group" aria-label="Clasificación"><button aria-pressed="${!teamView}" data-v="d">Pilotos</button><button aria-pressed="${teamView}" data-v="t">Equipos</button></div>`:""}</div>
@@ -693,7 +738,7 @@ const WIN2025={"au-1953":"Lando Norris","cn-2004":"Oscar Piastri","jp-1962":"Max
 const GPNAME=["","GP de Australia","GP de China","GP de Japón","GP de Miami","GP de Canadá","GP de Mónaco","GP de Barcelona-Catalunya","GP de Austria","GP de Gran Bretaña","GP de Bélgica","GP de Hungría","GP de los Países Bajos","GP de Italia","GP de España","GP de Azerbaiyán","GP de Baréin","GP de Singapur","GP de Estados Unidos","GP de la Ciudad de México","GP de São Paulo","GP de Las Vegas","GP de Qatar","GP de Abu Dabi"];
 const SHORT=["","Australia","China","Japón","Miami","Canadá","Mónaco","Barcelona-Catalunya","Austria","Gran Bretaña","Bélgica","Hungría","Países Bajos","Italia","España","Azerbaiyán","Baréin","Singapur","Estados Unidos","Ciudad de México","São Paulo","Las Vegas","Qatar","Abu Dabi"];
 const CIRC_ORDER=Object.keys(C3D).sort((a,b)=>C3D[a][6]-C3D[b][6]);
-const LAST_DONE=Math.max(0,...DATA.f1.results.rows.map(r=>r[0]));
+let LAST_DONE=Math.max(0,...DATA.f1.results.rows.map(r=>r[0]));
 function winnerInfo(id){const rd=C3D[id][6];if(rd<=LAST_DONE){const r=DATA.f1.results.rows.find(x=>x[0]===rd);return r?["Ganador 2026",r[5][0]]:null}return WIN2025[id]?["Ganador 2025",WIN2025[id]]:null}
 
 
@@ -942,6 +987,7 @@ function renderLegal(){
     <p>Para cualquier consulta, corrección de datos o petición de retirada de contenido puedes escribir a <a href="mailto:peoplemakeithappen2007@gmail.com">peoplemakeithappen2007@gmail.com</a>.</p>
     <h2>Datos deportivos</h2>
     <p>Los calendarios, horarios, resultados y clasificaciones son datos públicos recopilados de las webs oficiales de cada campeonato y de medios especializados. Pueden contener errores o quedar desactualizados. En caso de discrepancia prevalecen las clasificaciones oficiales publicadas por cada organizador.</p>
+    <p>Los resultados, la clasificación del Mundial y los datos del fin de semana de F1 se completan automáticamente con dos servicios públicos y no oficiales: <a href="https://openf1.org" target="_blank" rel="noopener">OpenF1</a> y <a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noopener">Jolpica</a>. Se publican unos minutos después de cada sesión.</p>
     <p>Las horas marcadas como «Estimada» se calculan a partir del horario habitual de cada circuito y se sustituyen por las oficiales en cuanto se publican.</p>
     <h2>Noticias</h2>
     <p>Los textos de la sección de noticias son resúmenes de redacción propia. Cada noticia enlaza a la fuente original, que es la que contiene la información completa.</p>
@@ -951,19 +997,283 @@ function renderLegal(){
     <h2>Juegos</h2>
     <p>El quiz y la porra son juegos gratuitos de entretenimiento, sin apuestas ni premios. Las respuestas y pronósticos se guardan solo en tu dispositivo.</p>
     <h2>Privacidad</h2>
-    <p>Parrilla no requiere registro, no recoge datos personales, no usa cookies de seguimiento ni herramientas de analítica y no carga recursos de servidores de terceros.</p>
+    <p>Parrilla no requiere registro, no recoge datos personales y no usa cookies de seguimiento ni herramientas de analítica.</p>
+    <p>Para mostrar los datos de F1 actualizados, tu navegador consulta directamente api.openf1.org y api.jolpi.ca. Como cualquier servidor web, pueden ver tu dirección IP; no se les envía ningún otro dato. Las respuestas se guardan unos días en tu dispositivo para que la web cargue más rápido y funcione sin conexión.</p>
     <p>Los pilotos que sigues, tus resultados del quiz y tus pronósticos se guardan solo en el almacenamiento local de tu dispositivo y no se envían a ningún servidor. Puedes borrarlos en cualquier momento.</p>
     <div><button class="btn" id="clear-favs">Borrar mis datos guardados</button> <span class="muted" id="clear-msg" style="font-size:13px"></span></div>
     <p>La web está alojada en GitHub Pages. Como cualquier servidor web, GitHub puede registrar datos técnicos de las visitas, como la dirección IP, según su propia <a href="https://docs.github.com/es/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">declaración de privacidad</a>.</p>
     <p>Los enlaces externos llevan a webs de terceros, que tienen sus propias políticas de privacidad.</p>
-    <p class="muted" style="font-size:13px">Última actualización: 22 de octubre de 2026.</p>
+    <p class="muted" style="font-size:13px">Última actualización: 23 de octubre de 2026.</p>
   </section>`;
   $("#clear-favs").addEventListener("click",()=>{favs=[];saveFavs();Object.keys(MEM).forEach(k=>delete MEM[k]);try{Object.keys(localStorage).filter(k=>k.startsWith("parrilla.")).forEach(k=>localStorage.removeItem(k))}catch(e){}qState=null;$("#clear-msg").textContent="Datos borrados."});
 }
+/* ===== datos en vivo ===== */
+/* Jolpica (api.jolpi.ca, sucesor de Ergast): Mundial y resultados de cada GP en cuanto se publican.
+   OpenF1 (api.openf1.org): sesiones del fin de semana, clasificación, neumáticos, paradas, dirección de carrera y tiempo.
+   Todo es opcional: si las APIs no responden, la web sigue con la instantánea de DATA. Nada se inventa: solo se muestra lo que llega. */
+const API={jol:"https://api.jolpi.ca/ergast/f1/",of1:"https://api.openf1.org/v1/"};
+const SEASON=2026, ROUNDS=23, LIVE_RACE_PTS=25;
+const LIVE={at:0,ok:false,tried:false,meeting:null,sess:{},sel:null,busy:false,sig:""};
+const LIVE_BASE={drivers:DATA.f1.drivers.map(r=>[...r]),teams:DATA.f1.teams.map(r=>[...r]),rows:DATA.f1.results.rows.map(r=>[...r]),
+  status:DATA.f1.status,facts:DATA.f1.facts,title:{...DATA.f1.title},events:DATA.f1.events.map(e=>({...e})),porra:PORRA.result,news:NEWS.slice(),last:LAST_DONE};
+const apiMem={};
+/* pide una URL con caché local; ttl puede depender de lo guardado. Si falla, devuelve lo último guardado (o null) */
+async function api(url,ttl,pick){
+  const key="api."+url,c=apiMem[key]||store.get(key,null),now=Date.now();
+  if(c&&now-c.t<(typeof ttl==="function"?ttl(c.d):ttl)){apiMem[key]=c;LIVE.at=Math.max(LIVE.at,c.t);LIVE.ok=true;return c.d}
+  try{
+    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
+    const r=await fetch(url,{signal:ctl.signal,cache:"no-store"});clearTimeout(to);
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    let d=await r.json();if(pick)d=pick(d);
+    const v={t:now,d};apiMem[key]=v;store.set(key,v);LIVE.at=Math.max(LIVE.at,now);LIVE.ok=true;return d;
+  }catch(e){if(c){LIVE.at=Math.max(LIVE.at,c.t);LIVE.ok=true}return c?c.d:null}
+}
+(function pruneApiCache(){try{const old=Date.now()-5*864e5;Object.keys(localStorage).filter(k=>k.startsWith("parrilla.api.")).forEach(k=>{try{if(JSON.parse(localStorage.getItem(k)).t<old)localStorage.removeItem(k)}catch(e){localStorage.removeItem(k)}})}catch(e){}})();
+
+/* nombres de la API → nombres que ya usa la web */
+const lastName=n=>norm(String(n).trim().split(" ").slice(-1)[0]);
+function drvName(given,family){
+  if(!family)return given||"";
+  const f=norm(family),hit=LIVE_BASE.drivers.find(r=>lastName(r[0])===f)||DATA.f1.drivers.find(r=>lastName(r[0])===f);
+  return hit?hit[0]:`${given||""} ${family===family.toUpperCase()?cap(family.toLowerCase()):family}`.trim();
+}
+const TEAM_KEYS=[["racing bulls","Racing Bulls"],["rb f1","Racing Bulls"],["visa cash","Racing Bulls"],["red bull","Red Bull"],["mercedes","Mercedes"],["ferrari","Ferrari"],["mclaren","McLaren"],["alpine","Alpine"],["haas","Haas"],["audi","Audi"],["sauber","Audi"],["williams","Williams"],["aston","Aston Martin"],["cadillac","Cadillac"]];
+function teamName(s){const n=norm(s||"");for(const [k,v] of TEAM_KEYS)if(n.includes(k))return v;return s||""}
+const surname=n=>String(n).split(" ").slice(-1)[0];
+const shortDate=iso=>new Intl.DateTimeFormat("es-ES",{day:"numeric",month:"short",timeZone:"UTC"}).format(new Date(iso+"T12:00:00Z")).replace(".","");
+
+/* ---- Jolpica: Mundial y resultados de las rondas que la instantánea aún no tiene ---- */
+function jolTTL(){const now=Date.now();for(const e of DATA.f1.events)for(const s of e.s||[]){const t=Date.parse(s[1]);if(now>t&&now-t<10*36e5)return 3*6e4}return 30*6e4}
+const races=d=>(d&&d.MRData&&d.MRData.RaceTable&&d.MRData.RaceTable.Races)||[];
+async function loadJolpica(){
+  const ttl=jolTTL(),J=(p,t)=>api(API.jol+SEASON+"/"+p,t);
+  const [ds,cs]=await Promise.all([J("driverstandings/?limit=50",ttl),J("constructorstandings/?limit=30",ttl)]);
+  const L=ds&&ds.MRData&&ds.MRData.StandingsTable&&ds.MRData.StandingsTable.StandingsLists[0];
+  if(!L||!L.DriverStandings||!L.DriverStandings.length)return null;
+  const round=+L.round,per=[];
+  for(let rd=LIVE_BASE.last+1;rd<=Math.min(round,ROUNDS);rd++){
+    const [res,q,sp]=await Promise.all([J(rd+"/results/?limit=50",ttl),J(rd+"/qualifying/?limit=50",ttl),J(rd+"/sprint/?limit=50",ttl)]);
+    per.push({rd,res:races(res)[0],q:races(q)[0],sp:races(sp)[0]});
+  }
+  const C=cs&&cs.MRData&&cs.MRData.StandingsTable&&cs.MRData.StandingsTable.StandingsLists[0];
+  return {round,L,C,per};
+}
+function applyJolpica(j){
+  const F=DATA.f1,B=LIVE_BASE;
+  F.drivers=B.drivers.map(r=>[...r]);F.teams=B.teams.map(r=>[...r]);F.results.rows=B.rows.map(r=>[...r]);F.status=B.status;F.facts=B.facts;
+  F.title={...B.title};delete F.champion;F.events=B.events.map(e=>({...e}));PORRA.result=B.porra;NEWS.splice(0,NEWS.length,...B.news);
+  if(j&&j.round>B.last){
+    try{
+      F.drivers=j.L.DriverStandings.map(s=>[drvName(s.Driver.givenName,s.Driver.familyName),teamName(((s.Constructors||[]).slice(-1)[0]||{}).name),+s.points,+s.wins||0]);
+      if(j.C&&j.C.ConstructorStandings)F.teams=j.C.ConstructorStandings.map(s=>[teamName(s.Constructor.name),+s.points]);
+      const nm=x=>drvName(x.Driver.givenName,x.Driver.familyName),news=[];
+      for(const p of j.per){
+        const R=p.res&&p.res.Results;if(!R||!R.length)continue;
+        const qp=p.q&&p.q.QualifyingResults&&p.q.QualifyingResults.find(x=>x.position==="1"),g1=R.find(x=>x.grid==="1");
+        const pole=qp?nm(qp):g1?nm(g1):"—",spw=p.sp&&p.sp.SprintResults&&p.sp.SprintResults.find(x=>x.position==="1");
+        const ev=F.events.find(e=>e.rd===p.rd),win=nm(R[0]),pod=R.slice(0,3).map(nm);
+        F.results.rows.push([p.rd,SHORT[p.rd]||p.res.raceName,ev?ev.place:"",shortDate(p.res.date),[pole],[win,teamName(R[0].Constructor&&R[0].Constructor.name)],spw?nm(spw):null,"Podio: "+pod.map(surname).join(", ")]);
+        if(ev){ev.done=true;ev.res="Ganador: "+win}
+        if(PORRA.id===`f1-${SEASON}-${p.rd}`&&pod.length===3)PORRA.result={pole,p1:win,podium:pod};
+        news.unshift({cat:"f1",d:shortDate(p.res.date),t:`${win} gana el ${GPNAME[p.rd]||p.res.raceName}`,s:`Podio: ${pod.join(", ")}. La pole fue para ${pole}.`,u:`https://www.formula1.com/en/results/${SEASON}/races`,src:"Parrilla · resultados en vivo"});
+      }
+      const D=F.drivers,L=D[0],S=D[1],left=Math.max(0,ROUNDS-j.round);
+      F.status=`Tras el ${GPNAME[j.round]||"GP"} · Ronda ${j.round} de ${ROUNDS}`;
+      F.title={ptsPerRace:LIVE_RACE_PTS,racesLeft:left};
+      F.facts=[[String(L[2]),surname(L[0])+", líder"],["+"+(L[2]-S[2]),"sobre "+surname(S[0])],[String(left),"carreras restantes"],[String(left*LIVE_RACE_PTS),"puntos en juego"]];
+      if(contenders("f1").length===1){
+        F.champion=`${L[0]} (${L[1]}) es campeón del mundo de Fórmula 1 de ${SEASON}${left?` a falta de ${left} ${left===1?"carrera":"carreras"}`:""}, con ${L[2]} puntos y ${L[3]} victorias.`;
+        F.facts=[[surname(L[0]),"campeón del mundo"],[String(L[2]),"puntos"],["+"+(L[2]-S[2]),"sobre "+surname(S[0])],[String(left),"carreras restantes"]];
+        delete F.title;
+        news.unshift({cat:"f1",d:news.length?news[0].d:shortDate(new Date().toISOString().slice(0,10)),t:`${L[0]}, campeón del mundo de F1 ${SEASON}`,s:`Se asegura el título con ${L[2]} puntos, ${L[2]-S[2]} más que ${S[0]}.`,u:`https://www.formula1.com/en/results/${SEASON}/drivers`,src:"Parrilla · resultados en vivo"});
+      }
+      NEWS.unshift(...news);
+    }catch(e){applyJolpica(null);return}
+  }
+  LAST_DONE=Math.max(0,...F.results.rows.map(r=>r[0]));
+}
+
+/* ---- OpenF1: el fin de semana en curso (o el último) ---- */
+const SNAME={"Practice 1":"Libres 1","Practice 2":"Libres 2","Practice 3":"Libres 3","Qualifying":"Clasificación","Sprint Qualifying":"Clasif. sprint","Sprint Shootout":"Clasif. sprint","Sprint":"Sprint","Race":"Carrera"};
+const sName=s=>SNAME[s.session_name]||s.session_name;
+const sState=s=>{const n=Date.now();return n<Date.parse(s.date_start)?"next":n<=Date.parse(s.date_end)?"live":"done"};
+async function loadMeeting(){
+  const ss=await api(API.of1+"sessions?year="+SEASON,6*36e5,d=>Array.isArray(d)?d.map(s=>({session_key:s.session_key,meeting_key:s.meeting_key,session_name:s.session_name,session_type:s.session_type,date_start:s.date_start,date_end:s.date_end,location:s.location,is_cancelled:s.is_cancelled})):d);
+  if(!Array.isArray(ss))return null;
+  const by={};ss.filter(s=>!s.is_cancelled&&s.date_start&&s.date_end).forEach(s=>(by[s.meeting_key]||=[]).push(s));
+  const ms=Object.values(by).filter(l=>l.some(s=>s.session_type==="Race")).map(l=>l.sort((a,b)=>a.date_start.localeCompare(b.date_start)));
+  ms.sort((a,b)=>a[0].date_start.localeCompare(b[0].date_start));
+  return ms.filter(l=>Date.parse(l[0].date_start)<=Date.now()+2*864e5).slice(-1)[0]||null;
+}
+const meetingEvent=m=>{const a=m[0].date_start.slice(0,10),b=m[m.length-1].date_start.slice(0,10);return DATA.f1.events.find(e=>e.start<=b&&e.end>=a)};
+const weekendOn=()=>{const m=LIVE.meeting;if(!m)return false;const n=Date.now();return n>=Date.parse(m[0].date_start)-36*36e5&&n<=Date.parse(m[m.length-1].date_end)+48*36e5};
+const RC_SC=[[/VIRTUAL SAFETY CAR DEPLOYED/,"Coche de seguridad virtual"],[/VIRTUAL SAFETY CAR ENDING/,"Fin del coche de seguridad virtual"],[/SAFETY CAR DEPLOYED/,"Coche de seguridad en pista"],[/SAFETY CAR IN THIS LAP/,"El coche de seguridad se retira en esta vuelta"]];
+function pickRC(d){
+  if(!Array.isArray(d))return d;
+  return d.filter(x=>x.category==="SafetyCar"||x.flag==="RED"||x.flag==="CHEQUERED"||/PENALTY|DISQUALIFIED/.test(x.message||"")).slice(-12).map(x=>({l:x.lap_number,c:x.category,f:x.flag,m:x.message}));
+}
+async function loadSession(s,full){
+  const k=s.session_key,ended=Date.parse(s.date_end),recent=Date.now()-ended<8*36e5;
+  const T=d=>Array.isArray(d)&&d.length?(recent?3*6e4:864e5):(recent?6e4:36e5),O=(p,pick)=>api(API.of1+p+"?session_key="+k,T,pick);
+  const race=s.session_type==="Race";
+  const [res,drv,stints,pits,rc,w]=await Promise.all([
+    O("session_result",d=>Array.isArray(d)?d.map(r=>({p:r.position,n:r.driver_number,laps:r.number_of_laps,dur:r.duration,gap:r.gap_to_leader,pts:r.points,dnf:r.dnf,dns:r.dns,dsq:r.dsq})):d),
+    O("drivers",d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,a:x.name_acronym,f:x.first_name,l:x.last_name,t:x.team_name,c:x.team_colour})):d),
+    full&&race?O("stints",d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,a:x.lap_start,b:x.lap_end,c:x.compound})):d):null,
+    full&&race?O("pit",d=>Array.isArray(d)?d.map(x=>({n:x.driver_number,l:x.lap_number,st:x.stop_duration,ln:x.lane_duration??x.pit_duration})):d):null,
+    full?O("race_control",pickRC):null,
+    full?O("weather",d=>Array.isArray(d)&&d.length?[d[d.length-1]]:d):null,
+  ]);
+  return {state:res==null?"off":res.length?"done":"wait",full,res,drv,stints,pits,rc,w:w&&w[0]};
+}
+function hubPick(){
+  const m=LIVE.meeting;if(!m)return null;
+  return (LIVE.sel&&m.find(x=>x.session_key===LIVE.sel))||m.find(s=>sState(s)==="live")||[...m].reverse().find(s=>sState(s)==="done")||m[0];
+}
+/* quién fue primero en una sesión de F1 de la agenda local (por hora de inicio) */
+function sessP1(iso){
+  const m=LIVE.meeting;if(!m)return "";
+  const s=m.find(x=>Math.abs(Date.parse(x.date_start)-Date.parse(iso))<3*36e5&&sState(x)==="done"),D=s&&LIVE.sess[s.session_key];
+  if(!D||!D.res||!D.res.length)return "";
+  const r=D.res.find(x=>x.p===1),d=r&&(D.drv||[]).find(x=>x.n===r.n);
+  return d?surname(drvName(d.f,d.l)):"";
+}
+const liveNow=(iso,n)=>{const t=Date.parse(iso),now=Date.now();return now>=t&&now<t+(/Carrera|Principal|Race/.test(n)?2.2:1.1)*36e5};
+const liveBadge='<span class="lb"><span class="live-dot on"></span>En directo</span>';
+
+/* ---- formato de tiempos ---- */
+const lapT=s=>{if(typeof s!=="number")return "—";const m=Math.floor(s/60),r=(s-m*60).toFixed(3).padStart(6,"0");return m?`${m}:${r}`:r};
+const raceT=s=>{if(typeof s!=="number")return "—";const h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=(s%60).toFixed(3).padStart(6,"0");return `${h}:${String(m).padStart(2,"0")}:${r}`};
+const gapT=g=>typeof g==="number"?"+"+g.toFixed(3):typeof g==="string"?g.replace(/^\+?(\d+)\s*LAPS?$/i,(_,n)=>`+${n} ${n==="1"?"vuelta":"vueltas"}`):"—";
+const dec=(x,d=1)=>Number(x).toLocaleString("es-ES",{maximumFractionDigits:d,minimumFractionDigits:d});
+function ago(t){const s=Math.max(0,Math.round((Date.now()-t)/1e3));return s<60?"hace un momento":s<3600?`hace ${Math.round(s/60)} min`:s<86400?`hace ${Math.round(s/3600)} h`:`hace ${Math.round(s/86400)} d`}
+
+/* ---- panel del fin de semana ---- */
+function hubMount(){const el=$("#hub-slot");if(!el)return;el.innerHTML=hubHTML(el.dataset.full==="1");
+  const c=el.querySelector(".spills"),p=c&&c.querySelector('[aria-pressed="true"]');if(p)c.scrollLeft=p.offsetLeft-c.offsetLeft-(c.clientWidth-p.offsetWidth)/2}
+function hubHTML(full){
+  const m=LIVE.meeting;
+  if(!m)return full?`<section class="panel sec"><h2>Fin de semana</h2><div class="empty">${LIVE.tried?"No se ha podido conectar con el servicio de datos de F1. Se vuelve a intentar cada minuto; mientras tanto tienes los resultados guardados en la pestaña Resultados.":"Cargando los datos del fin de semana…"}</div></section>`:"";
+  if(!full&&!weekendOn())return "";
+  const ev=meetingEvent(m),s=hubPick(),D=LIVE.sess[s.session_key];
+  const pills=m.map(x=>{const t=sState(x);return `<button class="spill" aria-pressed="${x===s}" data-sess="${x.session_key}">${t==="live"?'<span class="live-dot on"></span>':""}${esc(sName(x))}<span class="st">${t==="next"?esc(shortDay(x.date_start))+" "+hm(x.date_start):t==="live"?"en directo":"✓"}</span></button>`}).join("");
+  return `<section class="panel sec" style="--c:var(--f1)">
+    <div class="hdr"><div class="sec" style="gap:2px"><span class="eyebrow">Fin de semana de F1${ev?" · Ronda "+ev.rd:""}</span><h2>${esc(ev?ev.name:"GP de "+(m[0].location||""))}</h2></div><span class="muted mono" style="font-size:12px">${LIVE.at?`Datos: <span data-ago="${LIVE.at}">${ago(LIVE.at)}</span>`:""}</span></div>
+    <div class="spills" role="group" aria-label="Sesiones del fin de semana">${pills}</div>
+    ${sessBody(s,D)}</section>`;
+}
+function sessBody(s,D){
+  const st=sState(s),nm=esc(sName(s));
+  if(st==="next")return `<div class="livebox" style="--c:var(--line)"><span class="eyebrow">${nm} · ${esc(dayLabel(s.date_start))} a las ${hm(s.date_start)}</span><div class="big" data-cd="${s.date_start}"></div><p class="muted" style="font-size:14px">La clasificación de la sesión aparecerá aquí unos minutos después de que termine.</p></div>`;
+  if(st==="live")return `<div class="livebox"><span class="lb"><span class="live-dot on"></span>En directo · ${nm}</span><p><b>La sesión está en marcha.</b> Termina hacia las ${hm(s.date_end)}. En cuanto acabe, la clasificación, los neumáticos y las paradas aparecerán aquí solos, sin recargar.</p><p class="muted" style="font-size:13px">Los tiempos vuelta a vuelta en directo solo se publican en el live timing oficial de F1.</p><div class="links"><a href="https://www.formula1.com/en/timing/f1-live" target="_blank" rel="noopener">Live timing oficial ↗</a></div></div>`;
+  if(!D)return `<div class="empty">Cargando ${nm}…</div>`;
+  if(D.state==="off")return `<div class="empty">No se ha podido conectar con el servicio de datos de F1. Se vuelve a intentar cada minuto.</div>`;
+  if(D.state==="wait")return `<div class="livebox" style="--c:var(--amber)"><span class="eyebrow">${nm} · terminada</span><p>Esperando la clasificación oficial. Se comprueba cada minuto y aparecerá aquí sola.</p></div>`;
+  const race=s.session_type==="Race";
+  return `${wxHTML(D.w)}<div class="hubgrid"><div class="sec">${resTable(s,D)}</div>${race||(D.rc&&D.rc.length)?`<div class="sec" style="gap:18px">${race?tyreHTML(D):""}${race?pitHTML(D):""}${rcHTML(D.rc)}</div>`:""}</div>`;
+}
+const drvMap=D=>Object.fromEntries((D.drv||[]).map(d=>[d.n,d]));
+const dColor=d=>d&&/^[0-9a-f]{6}$/i.test(d.c||"")?"#"+d.c:(d&&TEAMC[teamName(d.t)])||"var(--line)";
+function resTable(s,D){
+  const dm=drvMap(D),q=s.session_type==="Qualifying",race=s.session_type==="Race",pts=race&&D.res.some(r=>r.pts);
+  const rows=[...D.res].sort((a,b)=>(a.p??99)-(b.p??99));
+  const body=rows.map((r,i)=>{
+    const d=dm[r.n]||{},name=d.l?drvName(d.f,d.l):"#"+r.n;let tm,ph="";
+    if(q){const k=[2,1,0].find(j=>Array.isArray(r.dur)&&typeof r.dur[j]==="number");tm=k==null?(r.dns?"No salió":r.dsq?"Descalificado":"Sin tiempo"):lapT(r.dur[k]);ph=k==null?"":"Q"+(k+1)}
+    else if(r.dsq)tm="Descalificado";else if(r.dns)tm="No salió";else if(r.dnf)tm="Abandono";
+    else tm=r.p===1?(race?raceT(r.dur):lapT(r.dur)):gapT(r.gap);
+    const fav=isFav("f1",name);
+    return `<tr class="${r.p===1?"p1":""} ${fav?"fav":""}"><td class="pos">${r.p??"—"}</td><td class="drv"><span class="tc" style="--tc:${dColor(d)}"></span>${esc(name)}<small>${esc(teamName(d.t))}</small></td>${q?`<td class="ph">${ph}</td>`:""}<td class="tm">${esc(tm)}</td>${race?(pts?`<td class="pts">${r.pts?dec(r.pts,0):""}</td>`:""):`<td class="tm">${r.laps??""}</td>`}</tr>`}).join("");
+  const head=`<th>Pos</th><th>Piloto</th>${q?"<th>Fase</th>":""}<th class="r">${q?"Mejor vuelta":race?"Tiempo":"Mejor vuelta"}</th>${race?(pts?'<th class="r">Pts</th>':""):'<th class="r">Vueltas</th>'}`;
+  return `<h3>Clasificación · ${esc(sName(s))}</h3><div class="tbl"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+function wxHTML(w){
+  if(!w)return "";
+  const it=[["Aire",w.air_temperature!=null?dec(w.air_temperature)+" °C":null],["Pista",w.track_temperature!=null?dec(w.track_temperature)+" °C":null],["Humedad",w.humidity!=null?Math.round(w.humidity)+" %":null],["Viento",w.wind_speed!=null?dec(w.wind_speed*3.6,0)+" km/h":null],["Lluvia",w.rainfall!=null?(w.rainfall?"Sí":"No"):null]].filter(x=>x[1]);
+  return it.length?`<div class="wx" aria-label="Tiempo al final de la sesión">${it.map(x=>`<span><b>${x[1]}</b>${x[0]}</span>`).join("")}</div>`:"";
+}
+const CMP={SOFT:["S","Blando"],MEDIUM:["M","Medio"],HARD:["H","Duro"],INTERMEDIATE:["I","Intermedio"],WET:["W","Lluvia"]};
+function tyreHTML(D){
+  if(!Array.isArray(D.stints)||!D.stints.length)return "";
+  const by={};D.stints.forEach(x=>(by[x.n]||=[]).push(x));
+  const max=Math.max(...D.stints.map(x=>x.b||0));if(!max)return "";
+  const dm=drvMap(D),order=[...D.res].sort((a,b)=>(a.p??99)-(b.p??99)).map(r=>r.n).filter(n=>by[n]);
+  const used=new Set();
+  const rows=order.map(n=>{
+    const d=dm[n]||{},L=by[n].sort((a,b)=>a.a-b.a),label=d.a||("#"+n);
+    const segs=L.map(x=>{const c=CMP[x.c]||["?","Desconocido"],cl=CMP[x.c]?"cmp-"+c[0]:"cmp-U";used.add(x.c);const w=(x.b-x.a+1)/max*100;
+      return `<span class="sg ${cl}" style="left:${((x.a-1)/max*100).toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(c[1])}: vueltas ${x.a}–${x.b}">${w>7?c[0]:""}</span>`}).join("");
+    const txt=L.map(x=>`${(CMP[x.c]||["","desconocido"])[1].toLowerCase()} (${x.a}–${x.b})`).join(", ");
+    return `<div class="ty" role="img" aria-label="${esc((d.l?drvName(d.f,d.l):label)+": "+txt)}"><span>${esc(label)}</span><span class="lane">${segs}</span><span class="np" title="Paradas">${L.length-1}</span></div>`}).join("");
+  return `<div class="sec" style="gap:8px"><div class="hdr"><h3>Estrategia de neumáticos</h3><span class="muted" style="font-size:12px">${max} vueltas · paradas a la derecha</span></div><div class="tyres">${rows}</div>
+  <div class="legend">${Object.entries(CMP).filter(([k])=>used.has(k)).map(([,v])=>`<span><span class="cmp cmp-${v[0]}"></span>${v[1]}</span>`).join("")}</div></div>`;
+}
+function pitHTML(D){
+  if(!Array.isArray(D.pits)||!D.pits.length)return "";
+  const dm=drvMap(D),who=n=>{const d=dm[n]||{};return d.l?drvName(d.f,d.l):"#"+n};
+  const st=D.pits.filter(p=>typeof p.st==="number"&&p.st>0).sort((a,b)=>a.st-b.st)[0],ln=D.pits.filter(p=>typeof p.ln==="number"&&p.ln>0).sort((a,b)=>a.ln-b.ln)[0];
+  const best=st?`<b>${esc(who(st.n))}</b>, ${dec(st.st)} s parado en la vuelta ${st.l}`:ln?`<b>${esc(who(ln.n))}</b>, ${dec(ln.ln)} s en el pit lane en la vuelta ${ln.l}`:"";
+  return `<div class="sec" style="gap:6px"><h3>Paradas</h3><p style="margin:0;font-size:14px">${D.pits.length} paradas en total.${best?" La más rápida: "+best+".":""}</p></div>`;
+}
+function rcHTML(rc){
+  if(!Array.isArray(rc)||!rc.length)return "";
+  const item=x=>{const m=x.m||"";let tag,cls,txt=m;
+    if(x.c==="SafetyCar"){tag=/VIRTUAL/.test(m)?"VSC":"Safety car";cls="sc";const t=RC_SC.find(r=>r[0].test(m));if(t)txt=t[1]}
+    else if(x.f==="RED"){tag="Bandera roja";cls="red";txt="Sesión detenida"}
+    else if(x.f==="CHEQUERED"){tag="Bandera a cuadros";cls="chq";txt="Final de la sesión"}
+    else {tag=/DISQUALIFIED/.test(m)?"Descalificación":"Sanción";cls=""}
+    return `<li><span class="lap">${x.l?"V"+x.l:""}</span><span class="flag ${cls}">${esc(tag)}</span><span${txt===m?' lang="en"':""}>${esc(txt)}</span></li>`};
+  return `<div class="sec" style="gap:8px"><h3>Dirección de carrera</h3><ul class="rc">${[...rc].reverse().map(item).join("")}</ul><span class="muted" style="font-size:12px">Banderas, coches de seguridad y sanciones. Los mensajes oficiales están en inglés.</span></div>`;
+}
+
+/* ---- ciclo de actualización: cada minuto y al volver a la pestaña ---- */
+function liveSig(){const F=DATA.f1,m=LIVE.meeting;return JSON.stringify([F.drivers,F.results.rows.length,PORRA.result,!!F.champion,m&&m.map(s=>[s.session_key,sState(s),(LIVE.sess[s.session_key]||{}).state])])}
+async function liveTick(){
+  if(LIVE.busy)return;LIVE.busy=true;
+  try{
+    applyJolpica(await loadJolpica());
+    LIVE.meeting=await loadMeeting();
+    const m=LIVE.meeting;
+    if(m){
+      const pick=hubPick();
+      for(const s of m){if(sState(s)!=="done")continue;const full=s===pick;const prev=LIVE.sess[s.session_key];
+        if(full||!prev||!prev.full)LIVE.sess[s.session_key]=await loadSession(s,full)||prev}
+    }
+  }catch(e){}
+  LIVE.tried=true;LIVE.busy=false;stampUpdate();
+  const sig=liveSig();
+  if(sig!==LIVE.sig){LIVE.sig=sig;liveRender()}
+}
+/* vuelve a pintar la vista actual sin mover el scroll, salvo si el usuario está escribiendo o eligiendo algo */
+function liveRender(){
+  const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName))return hubMount();
+  if(current==="home"||current==="f1"||current==="circuitos")go(decodeURIComponent(location.hash.slice(1))||"home",true,true);
+  else hubMount();
+}
+async function hubSelect(k){
+  LIVE.sel=k;hubMount();const s=hubPick();
+  if(s&&sState(s)==="done"&&!(LIVE.sess[k]&&LIVE.sess[k].full)){LIVE.sess[k]=await loadSession(s,true);LIVE.sig=liveSig();hubMount()}
+}
+function stampUpdate(){
+  const el=$("#stamp");if(!el)return;
+  el.classList.toggle("on",!!(LIVE.ok&&LIVE.at));
+  el.innerHTML=LIVE.ok&&LIVE.at?`<span class="live-dot ok"></span>F1 en vivo · <span data-ago="${LIVE.at}">${ago(LIVE.at)}</span>`:"Actualizado: "+esc(UPDATED);
+}
+function liveClocks(){
+  document.querySelectorAll("[data-ago]").forEach(el=>{el.textContent=ago(+el.dataset.ago)});
+  document.querySelectorAll("[data-cd]").forEach(el=>{const ms=Date.parse(el.dataset.cd)-Date.now();if(ms<=0){el.textContent="Empezando…";if(!LIVE.busy&&ms>-9e4)liveTick();return}
+    const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),mi=Math.floor(ms%36e5/6e4),se=Math.floor(ms%6e4/1e3);el.textContent=`${d?d+"d ":""}${String(h).padStart(2,"0")}:${String(mi).padStart(2,"0")}:${String(se).padStart(2,"0")}`});
+}
+setInterval(liveClocks,1000);
+setInterval(()=>{if(!document.hidden)liveTick()},60e3);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)liveTick()});
+
 /* ===== interacción ===== */
 document.addEventListener("click",e=>{
   const cb=e.target.closest("[data-circ]");if(cb){go("circuitos/"+cb.dataset.circ);return}
   const gt=e.target.closest("[data-goto]");if(gt){go(gt.dataset.goto);return}
+  const sp=e.target.closest("[data-sess]");if(sp){hubSelect(+sp.dataset.sess);return}
   const qa=e.target.closest("[data-qa]");if(qa){quizAnswer(+qa.dataset.qa);return}
   if(e.target.closest("#qnext")){quizNext();return}
   const st=e.target.closest(".star[data-fav]");
@@ -984,11 +1294,12 @@ $("#q").addEventListener("input",e=>{
 });
 $("#q").addEventListener("keydown",e=>{if(e.key==="Escape"){$("#qres").hidden=true;e.target.blur()}});
 $("#stamp").textContent="Actualizado: "+UPDATED;
-$("#foot").innerHTML=`<span>Parrilla es un proyecto independiente, sin relación con Formula 1, la FIA ni los organizadores de los campeonatos.</span><span>Datos actualizados el ${UPDATED}. Horarios en ${TZ_LABEL}. «Estimada»: hora prevista, pendiente de confirmación oficial.</span><a href="#legal" id="legal-link">Aviso legal y privacidad</a>`;
+$("#foot").innerHTML=`<span>Parrilla es un proyecto independiente, sin relación con Formula 1, la FIA ni los organizadores de los campeonatos.</span><span>Datos actualizados el ${UPDATED}; los de F1 se completan solos con OpenF1 y Jolpica. Horarios en ${TZ_LABEL}. «Estimada»: hora prevista, pendiente de confirmación oficial.</span><a href="#legal" id="legal-link">Aviso legal y privacidad</a>`;
 $("#foot").addEventListener("click",e=>{if(e.target.id==="legal-link"){e.preventDefault();go("legal")}});
 let start="home";try{start=decodeURIComponent(location.hash.slice(1))||"home"}catch(e){}
 go(start,false,true);
 window.addEventListener("popstate",()=>{sub="clas";teamView=false;go(decodeURIComponent(location.hash.slice(1))||"home",false,true)});
+LIVE.sig=liveSig();liveTick();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 

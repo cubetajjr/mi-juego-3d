@@ -1,5 +1,5 @@
 // Network first so new data shows up as soon as it is published; the cached copy keeps the app working offline.
-const CACHE = "parrilla-v2";
+const CACHE = "parrilla-v3";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => {

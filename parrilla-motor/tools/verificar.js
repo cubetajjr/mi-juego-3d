@@ -3,13 +3,17 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { ({ chromium } = require('/opt/node22/lib/node_modules/playwright')); }
+const API_HOSTS = /api\.(openf1\.org|jolpi\.ca)/;
 const page = 'file://' + path.resolve(__dirname, '..', 'index.html');
 (async () => {
   const b = await chromium.launch(); const errs = [];
   for (const vp of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
-    const pg = await (await b.newContext({ viewport: vp, timezoneId: 'Europe/Madrid' })).newPage();
+    const ctx = await b.newContext({ viewport: vp, timezoneId: 'Europe/Madrid' });
+    // Sin red hacia las APIs de F1: la web tiene que funcionar igual con su instantánea (los datos en vivo se prueban en probar-directo.js)
+    await ctx.route(API_HOSTS, r => r.abort());
+    const pg = await ctx.newPage();
     pg.on('pageerror', e => errs.push(e.message));
-    pg.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+    pg.on('console', m => { if (m.type() === 'error' && !API_HOSTS.test(m.location().url || '')) errs.push(m.text()); });
     await pg.goto(page); await pg.waitForTimeout(300);
     for (const k of await pg.$$eval('.tab', t => t.map(x => x.dataset.k))) { await pg.click(`.tab[data-k="${k}"]`); await pg.waitForTimeout(80); }
     await pg.click('#legal-link');

@@ -23,7 +23,8 @@ porra del fin de semana y «Mis pilotos».
 | --- | --- |
 | `index.html` | toda la web en un solo archivo (≈320 KB, con las fuentes incrustadas) |
 | `ACTUALIZAR.md` | instrucciones para actualizar los datos (las usa la tarea automática) |
-| `tools/verificar.js` | abre todas las secciones en Chromium y falla si hay errores de JavaScript |
+| `tools/verificar.js` | abre todas las secciones en Chromium (sin red hacia las APIs) y falla si hay errores de JavaScript |
+| `tools/probar-directo.js` | prueba la capa en vivo con respuestas de prueba (después de la carrera, sesión en directo, sin conexión) |
 | `manifest.webmanifest`, `sw.js`, `icon*.png`, `icon.svg` | instalable como app y funciona sin conexión |
 | `og.png` | imagen al compartir el enlace |
 
@@ -32,7 +33,8 @@ Dentro de `index.html`: el bloque `/* ===== DATOS · instantánea <fecha> ===== 
 `renderHome`, `renderSeries`, `renderCircuits`/`renderCircuit`, `renderPlay` (quiz y porra), `renderLegal`,
 y el router `go()`, con historial del navegador (`#f1`, `#circuitos/us-2012`, …).
 
-Comprobar después de cada cambio: `node parrilla-motor/tools/verificar.js` (tiene que acabar en `OK`).
+Comprobar después de cada cambio: `node parrilla-motor/tools/verificar.js` y `node parrilla-motor/tools/probar-directo.js`
+(los dos tienen que acabar en `OK`).
 Playwright está en `/opt/node22/lib/node_modules/playwright`; la página funciona abierta como `file://`.
 
 ## Lo que ya se ha hecho
@@ -57,30 +59,36 @@ Tarea programada **«Actualizar Parrilla Motor»** (`trig_01YC1EXR4yS9qJ8oPTHTiD
 `verificar.js`, hace commit en `main` e intenta actualizar también la vista previa. Primera ejecución:
 lunes 26 de octubre de 2026, tras el GP de Estados Unidos.
 
-## Pendiente: datos en directo (lo que el dueño quiere ahora)
+## Datos en vivo de F1 (hecho el 23 oct 2026)
 
-El dueño quiere que la web se actualice **al segundo**, como una app de timing. Lo investigado:
+El dueño eligió la opción gratis. Bloque `/* ===== datos en vivo ===== */` de `index.html`:
 
-- **OpenF1** (api.openf1.org): gratis solo da datos poco después de cada sesión. El directo exige una
-  cuenta de pago con precio según uso y no publicado ([condiciones](https://tally.so/r/w2yWDb),
-  [autenticación](https://openf1.org/auth.html)); aun así, `/location`, `/car_data` e `/intervals` no
-  están disponibles en directo.
-- **Live timing oficial de F1**: parte exige suscripción a F1 TV; no se puede leer desde el navegador
-  (hace falta un servidor intermedio) y usarlo en una web pública va contra sus condiciones.
-- **F2, F3, F4, F1 Academy**: no hay servicios públicos. Seguirán con la actualización automática y los
-  enlaces a sus tiempos en directo.
-- **GitHub Pages no tiene servidor**: una clave de pago no puede ir dentro de la web. Haría falta un
-  pequeño servidor (por ejemplo, un Worker gratuito de Cloudflare) que guarde la clave.
+- **Jolpica** (`api.jolpi.ca/ergast/f1/2026/...`): Mundial de pilotos y equipos y, para cada ronda posterior a la
+  instantánea, resultados, clasificación y sprint. `applyJolpica` rehace `DATA.f1` (clasificación, `status`, `facts`,
+  `title`, filas de resultados, eventos disputados), rellena `PORRA.result`, añade una noticia del ganador y detecta
+  al campeón (`DATA.f1.champion`, tarjeta dorada). Parte siempre de `LIVE_BASE` (copia de la instantánea), así que
+  aplicarlo varias veces no duplica nada. Solo actúa si la ronda de Jolpica es mayor que la última de `DATA`.
+- **OpenF1** (`api.openf1.org/v1/...`): `sessions` del año, y por sesión `session_result`, `drivers`, `stints`, `pit`,
+  `race_control` (solo coches de seguridad, banderas roja y a cuadros, sanciones) y `weather`. Se ve en el panel
+  «Fin de semana» (en Inicio desde 36 h antes hasta 48 h después del GP, y siempre en la subpestaña F1 → Fin de semana):
+  selector de sesiones, clasificación, estrategia de neumáticos, paradas, dirección de carrera y tiempo.
+  También pone «P1 …» y «En directo» en la agenda y en el horario de la cabecera.
+- Caché en `localStorage` (`parrilla.api.*`, se borra a los 5 días). Se refresca cada minuto y al volver a la pestaña;
+  cada respuesta tiene su caducidad (3 min tras una sesión, 30 min el resto de la semana, 6 h la lista de sesiones).
+  Límites: Jolpica 500 peticiones/hora por IP, OpenF1 30 cada 10 s. Cada visitante pide desde su navegador.
+- **Sin directo de verdad:** OpenF1 gratis no da datos durante la sesión. Mientras dura, el panel dice «En directo»
+  con enlace al live timing oficial y los resultados aparecen solos unos minutos después de terminar.
+- Si las APIs fallan, la web sigue con la instantánea (probado en `probar-directo.js`, escenario «sin conexión»).
+- Nombres: `drvName` empareja por apellido con los nombres de `DATA` («Andrea Kimi Antonelli» → «Kimi Antonelli»);
+  `teamName` normaliza equipos («Red Bull Racing» → «Red Bull», «RB F1 Team» → «Racing Bulls»).
 
-Propuesta hecha al dueño, sin decisión todavía:
-1. **Gratis:** la web consulta OpenF1 y **Jolpica** (api.jolpi.ca, sucesor de Ergast) al abrirse, para
-   mostrar resultados, parrilla, vueltas rápidas y Mundial actualizado minutos después de cada sesión.
-2. **De pago:** torre de tiempos en vivo, posiciones, neumáticos, paradas, banderas y mensajes de carrera
-   con la suscripción de OpenF1 y un servidor en Cloudflare.
+**Sin probar contra las APIs reales:** el entorno sigue bloqueando `api.openf1.org` y `api.jolpi.ca`. El código usa los
+campos documentados en el código fuente de OpenF1 (`br-g/openf1`) y en la documentación de Jolpica
+(`jolpica/jolpica-f1/docs`). Lo primero de la próxima sesión, si el dueño permite esos dominios: llamar a las APIs de
+verdad y comparar con `probar-directo.js`.
 
-**Bloqueo:** el entorno tiene cerrado el acceso a esas APIs. El dueño debe permitir `api.openf1.org` y
-`api.jolpi.ca` en la configuración de red del entorno antes de poder probar nada. No inventes respuestas
-de la API: compruébalas.
+Siguiente paso posible (de pago): torre de tiempos al segundo con la suscripción de OpenF1 y un Worker de Cloudflare que
+guarde la clave (GitHub Pages no tiene servidor). F2, F3, F4 y F1 Academy siguen sin servicio público.
 
 ## Otras ideas pendientes
 

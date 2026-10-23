@@ -49,14 +49,22 @@ GitHub Pages publica la web sola en uno o dos minutos.
    reglamento, curiosidades). Puedes añadir alguna nueva si es un dato seguro y comprobado.
 6. Si cambia el campeón de algún campeonato, revisa también los textos de `facts` y `champion`.
 
+## Datos en vivo de F1
+
+La web completa sola los datos de F1 con Jolpica y OpenF1 (ver `CONTEXTO.md`). Aun así, actualiza `DATA.f1`
+como siempre: la instantánea es lo que ve quien no tiene conexión y la base sobre la que se aplican los datos en vivo.
+No toques el bloque `/* ===== datos en vivo ===== */`. Si un GP ya está en `DATA.f1.results.rows`, la capa en vivo
+no lo vuelve a añadir.
+
 ## Comprobar y publicar
 
 ```bash
-node parrilla-motor/tools/verificar.js     # tiene que terminar con "OK"
+node parrilla-motor/tools/verificar.js       # tiene que terminar con "OK"
+node parrilla-motor/tools/probar-directo.js  # también "OK"
 git add parrilla-motor/index.html
 git commit -m "Update Parrilla Motor data after <evento>"
 git push -u origin main
 ```
 
-Si `verificar.js` da errores, arréglalos antes de subir nada. No toques el diseño ni el código
+Si alguna de las dos da errores, arréglalos antes de subir nada. No toques el diseño ni el código
 de la web en una actualización de datos.
