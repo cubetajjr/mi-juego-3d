@@ -95,6 +95,11 @@ campos documentados en el código fuente de OpenF1 (`br-g/openf1`) y en la docum
 (`jolpica/jolpica-f1/docs`). Lo primero de la próxima sesión, si el dueño permite esos dominios: llamar a las APIs de
 verdad y comparar con `probar-directo.js`.
 
+**Decisión del dueño (23 oct):** de momento no paga el directo. El fin de semana del GP de Estados Unidos se prueba
+con resultados justo después de cada sesión y luego decide. Precio encontrado: OpenF1 en directo, 9,90 €/mes para uso
+personal (para una web pública el precio va según el uso, a consultar en https://tally.so/r/w2yWDb). No volver a
+proponerlo hasta que el dueño lo saque.
+
 Siguiente paso posible (de pago): torre de tiempos al segundo con la suscripción de OpenF1 y un Worker de Cloudflare que
 guarde la clave (GitHub Pages no tiene servidor). F2, F3, F4 y F1 Academy siguen sin servicio público.
 
